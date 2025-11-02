@@ -155,8 +155,6 @@ A: 检查后端日志，配置应自动重载。如仍无效请重启后端
 **Q: 登录失败？**  
 A: 检查 `.env` 中的 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD`
 
-**Q: Ubuntu 系统部署问题？**  
-A: 参考 `DEPLOY.md` 中的详细部署指南和故障排查章节
 
 **Q: AI 调用失败？**  
 A: 检查 API Key 和 Base URL 配置是否正确
@@ -164,5 +162,6 @@ A: 检查 API Key 和 Base URL 配置是否正确
 ## License
 
 MIT License
+
 
 
