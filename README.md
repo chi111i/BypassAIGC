@@ -89,6 +89,8 @@ COMPRESSION_BASE_URL=http://IP:PORT/v1
 
 ### 3. 启动服务
 
+**数据库说明**: 数据库会在首次启动后端服务时自动创建，无需手动初始化。
+
 **Windows 系统:**
 ```powershell
 # 一键启动（推荐）

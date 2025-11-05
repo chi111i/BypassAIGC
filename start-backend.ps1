@@ -12,6 +12,11 @@ if (-not (Test-Path "venv")) {
     exit 1
 }
 
+# 检查并初始化数据库
+if (-not (Test-Path "ai_polish.db")) {
+    Write-Host "首次运行，数据库将在服务启动时自动创建..." -ForegroundColor Cyan
+}
+
 # 启动后端
 Write-Host "服务地址: http://localhost:8000" -ForegroundColor Cyan
 Write-Host "API 文档: http://localhost:8000/docs`n" -ForegroundColor Cyan

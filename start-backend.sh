@@ -35,6 +35,12 @@ if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
     sleep 2
 fi
 
+# 初始化数据库（如果不存在）
+if [ ! -f "ai_polish.db" ]; then
+    echo -e "${CYAN}首次运行，正在初始化数据库...${NC}"
+    echo -e "${CYAN}数据库将在后端服务启动时自动创建${NC}"
+fi
+
 # 启动服务
 echo -e "${GREEN}✓ 后端服务启动中...${NC}"
 echo -e "${CYAN}访问地址: http://localhost:8000${NC}"
