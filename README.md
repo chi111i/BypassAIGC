@@ -20,6 +20,17 @@ gptzero
 
 ## 快速开始
 
+### 使用 Windows 可执行文件 (推荐 Windows 用户)
+
+如果你是 Windows 用户，可以直接下载预编译的可执行文件，无需安装 Python 环境：
+
+1. 从 [Releases](https://github.com/chi111i/BypassAIGC/releases) 页面下载最新的 `BypassAIGC-Backend.exe`
+2. 在可执行文件所在目录创建 `.env` 配置文件（参考下面的配置文件部分）
+3. 双击运行 `BypassAIGC-Backend.exe` 启动后端服务
+4. 按照下面的步骤安装和启动前端
+
+详细的构建说明请参考 [backend/BUILD.md](backend/BUILD.md)
+
 ### 1. 使用统一启动脚本
 
 所有系统现已整合为统一的交互式脚本，通过菜单选择所需功能：
