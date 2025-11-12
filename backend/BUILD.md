@@ -87,7 +87,9 @@ pyinstaller build.spec
 可执行文件需要 `.env` 配置文件才能正常运行。请确保：
 
 1. 在可执行文件所在目录或上级目录创建 `.env` 文件
-2. 参考主 README.md 中的配置说明填写必要的配置项
+2. 可以复制 `backend/.env.example` 文件并重命名为 `.env`
+3. 参考 `.env.example` 中的说明填写必要的配置项
+4. 详细配置说明请参考主 README.md
 
 ## 注意事项
 
