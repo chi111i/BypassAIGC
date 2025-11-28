@@ -462,145 +462,136 @@ const AdminDashboard = () => {
                 {/* 第一行：用户和会话统计 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                   {/* Total Users */}
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                  <div className="bg-white rounded-2xl shadow-ios p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">总用户数</p>
-                        <p className="text-3xl font-bold text-gray-900">{statistics.users.total}</p>
-                        <p className="text-xs text-green-600 mt-1">
-                          今日新增 +{statistics.users.today_new}
-                        </p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">总用户数</p>
+                        <p className="text-3xl font-bold text-gray-900 tracking-tight">{statistics.users.total}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                            +{statistics.users.today_new} 今日
+                          </span>
+                        </div>
                       </div>
-                      <div className="bg-blue-100 p-3 rounded-full">
-                        <Users className="w-6 h-6 text-blue-600" />
+                      <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
+                        <Users className="w-6 h-6 text-gray-600" />
                       </div>
                     </div>
                   </div>
 
                   {/* Active Users */}
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                  <div className="bg-white rounded-2xl shadow-ios p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">启用用户</p>
-                        <p className="text-3xl font-bold text-green-600">{statistics.users.active}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          禁用 {statistics.users.inactive}
-                        </p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">启用用户</p>
+                        <p className="text-3xl font-bold text-gray-900 tracking-tight">{statistics.users.active}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full">
+                            {statistics.users.inactive} 禁用
+                          </span>
+                        </div>
                       </div>
-                      <div className="bg-green-100 p-3 rounded-full">
+                      <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
                         <CheckCircle className="w-6 h-6 text-green-600" />
                       </div>
                     </div>
                   </div>
 
                   {/* Today Active */}
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                  <div className="bg-white rounded-2xl shadow-ios p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">今日活跃</p>
-                        <p className="text-3xl font-bold text-purple-600">{statistics.users.today_active}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          7日活跃 {statistics.users.recent_active_7days}
-                        </p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">今日活跃</p>
+                        <p className="text-3xl font-bold text-gray-900 tracking-tight">{statistics.users.today_active}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            {statistics.users.recent_active_7days} (7日)
+                          </span>
+                        </div>
                       </div>
-                      <div className="bg-purple-100 p-3 rounded-full">
-                        <Activity className="w-6 h-6 text-purple-600" />
+                      <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                        <Activity className="w-6 h-6 text-blue-600" />
                       </div>
                     </div>
                   </div>
 
                   {/* Total Sessions */}
-                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                  <div className="bg-white rounded-2xl shadow-ios p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">总会话数</p>
-                        <p className="text-3xl font-bold text-orange-600">{statistics.sessions.total}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          完成 {statistics.sessions.completed} | 今日 {statistics.sessions.today}
-                        </p>
+                        <p className="text-sm font-medium text-gray-500 mb-1">总会话数</p>
+                        <p className="text-3xl font-bold text-gray-900 tracking-tight">{statistics.sessions.total}</p>
+                        <div className="flex items-center gap-1 mt-2">
+                          <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                            {statistics.sessions.today} 今日
+                          </span>
+                        </div>
                       </div>
-                      <div className="bg-orange-100 p-3 rounded-full">
-                        <Activity className="w-6 h-6 text-orange-600" />
+                      <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+                        <Database className="w-6 h-6 text-purple-600" />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 第二行：处理统计 */}
+                {/* 第二行：处理统计 - 统一使用白色背景，更专业 */}
                 {statistics.processing && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {/* Total Characters Processed */}
-                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-blue-100 text-sm mb-1">累计处理字符</p>
-                          <p className="text-3xl font-bold">{statistics.processing.total_chars_processed.toLocaleString()}</p>
-                          <p className="text-xs text-blue-100 mt-1">
-                            约 {Math.round(statistics.processing.total_chars_processed / 1000)}K 字符
-                          </p>
+                    <div className="bg-white rounded-2xl shadow-ios p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
+                          <BarChart3 className="w-5 h-5 text-indigo-600" />
                         </div>
-                        <div className="bg-blue-400 bg-opacity-30 p-3 rounded-full">
-                          <BarChart3 className="w-8 h-8 text-white" />
-                        </div>
+                        <span className="text-xs font-medium text-gray-400">累计</span>
                       </div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">处理字符数</p>
+                      <p className="text-2xl font-bold text-gray-900 tracking-tight">
+                        {statistics.processing.total_chars_processed.toLocaleString()}
+                      </p>
                     </div>
 
                     {/* Average Processing Time */}
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-green-100 text-sm mb-1">平均处理时间</p>
-                          <p className="text-3xl font-bold">
-                            {Math.round(statistics.processing.avg_processing_time)}秒
-                          </p>
+                    <div className="bg-white rounded-2xl shadow-ios p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
+                          <Clock className="w-5 h-5 text-orange-600" />
                         </div>
-                        <div className="bg-green-400 bg-opacity-30 p-3 rounded-full">
-                          <Clock className="w-8 h-8 text-white" />
-                        </div>
+                        <span className="text-xs font-medium text-gray-400">平均</span>
                       </div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">处理耗时</p>
+                      <p className="text-2xl font-bold text-gray-900 tracking-tight">
+                        {Math.round(statistics.processing.avg_processing_time)}
+                        <span className="text-sm font-normal text-gray-500 ml-1">秒</span>
+                      </p>
                     </div>
 
                     {/* Paper Polish Count */}
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl shadow-lg p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-purple-100 text-sm mb-1">论文润色</p>
-                          <p className="text-3xl font-bold">{statistics.processing.paper_polish_count}</p>
+                    <div className="bg-white rounded-2xl shadow-ios p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-teal-600" />
                         </div>
-                        <div className="bg-purple-400 bg-opacity-30 p-3 rounded-full">
-                          <FileText className="w-8 h-8 text-white" />
-                        </div>
+                        <span className="text-xs font-medium text-gray-400">计数</span>
                       </div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">论文润色</p>
+                      <p className="text-2xl font-bold text-gray-900 tracking-tight">
+                        {statistics.processing.paper_polish_count}
+                      </p>
                     </div>
 
                     {/* Paper Polish Enhance Count */}
-                    <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-xl shadow-lg p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-indigo-100 text-sm mb-1">论文润色增强</p>
-                          <p className="text-3xl font-bold">{statistics.processing.paper_polish_enhance_count}</p>
+                    <div className="bg-white rounded-2xl shadow-ios p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-10 h-10 bg-rose-50 rounded-lg flex items-center justify-center">
+                          <TrendingUp className="w-5 h-5 text-rose-600" />
                         </div>
-                        <div className="bg-indigo-400 bg-opacity-30 p-3 rounded-full">
-                          <TrendingUp className="w-8 h-8 text-white" />
-                        </div>
+                        <span className="text-xs font-medium text-gray-400">计数</span>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 第三行：感情文章润色 */}
-                {statistics.processing && (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-gradient-to-br from-pink-500 to-pink-600 text-white rounded-xl shadow-lg p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-pink-100 text-sm mb-1">感情文章润色</p>
-                          <p className="text-3xl font-bold">{statistics.processing.emotion_polish_count}</p>
-                        </div>
-                        <div className="bg-pink-400 bg-opacity-30 p-3 rounded-full">
-                          <FileText className="w-8 h-8 text-white" />
-                        </div>
-                      </div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">润色 + 增强</p>
+                      <p className="text-2xl font-bold text-gray-900 tracking-tight">
+                        {statistics.processing.paper_polish_enhance_count}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -610,54 +601,56 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Card Key Generation */}
               <div className="lg:col-span-1">
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                <div className="bg-white rounded-2xl shadow-ios p-6">
                   <div className="flex items-center gap-3 mb-6">
-                    <Key className="w-6 h-6 text-blue-600" />
-                    <h2 className="text-xl font-semibold text-gray-800">生成卡密</h2>
+                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                      <Key className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <h2 className="text-lg font-bold text-gray-900">生成卡密</h2>
                   </div>
 
                   <form onSubmit={handleGenerateCardKey} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-500 mb-2">
                         卡密内容
                       </label>
                       <input
                         type="text"
                         value={newCardKey}
                         onChange={(e) => setNewCardKey(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
                         placeholder="输入自定义卡密"
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm shadow-sm"
                     >
-                      <Plus className="w-5 h-5" />
+                      <Plus className="w-4 h-4" />
                       生成卡密
                     </button>
                     
                     <button
                       type="button"
                       onClick={() => setShowBatchModal(true)}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold py-2.5 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
                     >
-                      <Key className="w-5 h-5" />
+                      <Key className="w-4 h-4" />
                       批量生成
                     </button>
                   </form>
 
                   {generatedKey && (
-                    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-gray-600 mb-2">生成的卡密：</p>
+                    <div className="mt-6 p-4 bg-green-50/50 border border-green-100 rounded-xl">
+                      <p className="text-xs font-medium text-green-700 mb-2 uppercase tracking-wide">生成的卡密</p>
                       <div className="flex items-center gap-2">
-                        <code className="flex-1 bg-white px-3 py-2 rounded border border-gray-300 text-sm font-mono">
+                        <code className="flex-1 bg-white px-3 py-2 rounded-lg border border-green-200 text-sm font-mono text-green-800">
                           {generatedKey}
                         </code>
                         <button
                           onClick={() => copyToClipboard(generatedKey)}
-                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
+                          className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors shadow-sm"
                         >
                           复制
                         </button>
@@ -669,17 +662,19 @@ const AdminDashboard = () => {
 
               {/* Users List */}
               <div className="lg:col-span-2">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-                  <div className="p-6 border-b border-gray-200">
+                <div className="bg-white rounded-2xl shadow-ios overflow-hidden">
+                  <div className="p-6 border-b border-gray-100">
                     <div className="flex items-center justify-between flex-wrap gap-4">
                       <div className="flex items-center gap-3">
-                        <Users className="w-6 h-6 text-blue-600" />
-                        <h2 className="text-xl font-semibold text-gray-800">用户管理</h2>
+                        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center">
+                          <Users className="w-5 h-5 text-gray-600" />
+                        </div>
+                        <h2 className="text-lg font-bold text-gray-900">用户管理</h2>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={exportUsersToCSV}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm"
+                          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm font-medium"
                         >
                           <Download className="w-4 h-4" />
                           导出CSV
@@ -687,7 +682,7 @@ const AdminDashboard = () => {
                         <button
                           onClick={() => { fetchUsers(); fetchStatistics(); }}
                           disabled={loadingUsers}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors text-sm"
+                          className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors text-sm font-medium shadow-sm"
                         >
                           <RefreshCw className={`w-4 h-4 ${loadingUsers ? 'animate-spin' : ''}`} />
                           刷新

@@ -67,6 +67,7 @@ class SessionResponse(BaseModel):
     progress: float
     current_position: int
     total_segments: int
+    original_char_count: int = 0
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime

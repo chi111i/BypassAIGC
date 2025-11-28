@@ -98,15 +98,17 @@ const ConfigManager = ({ adminToken }) => {
   return (
     <div className="space-y-6">
       {/* 润色模型配置 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl shadow-ios p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Cpu className="w-6 h-6 text-green-600" />
-          <h3 className="text-xl font-semibold text-gray-800">润色模型配置</h3>
+          <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
+            <Cpu className="w-5 h-5 text-teal-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">润色模型配置</h3>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               模型名称
             </label>
             <input
@@ -114,12 +116,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.POLISH_MODEL}
               onChange={(e) => setFormData({...formData, POLISH_MODEL: e.target.value})}
               placeholder="gemini-2.5-pro"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               API Key (可选)
             </label>
             <input
@@ -127,12 +129,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.POLISH_API_KEY}
               onChange={(e) => setFormData({...formData, POLISH_API_KEY: e.target.value})}
               placeholder="留空使用默认 OpenAI Key"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Base URL
             </label>
             <input
@@ -140,22 +142,24 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.POLISH_BASE_URL}
               onChange={(e) => setFormData({...formData, POLISH_BASE_URL: e.target.value})}
               placeholder="http://localhost:8317/v1"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
         </div>
       </div>
 
       {/* 增强模型配置 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl shadow-ios p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Cpu className="w-6 h-6 text-purple-600" />
-          <h3 className="text-xl font-semibold text-gray-800">论文增强模型配置</h3>
+          <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+            <Cpu className="w-5 h-5 text-purple-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">论文增强模型配置</h3>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               模型名称
             </label>
             <input
@@ -163,12 +167,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.ENHANCE_MODEL}
               onChange={(e) => setFormData({...formData, ENHANCE_MODEL: e.target.value})}
               placeholder="gemini-2.5-pro"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               API Key (可选)
             </label>
             <input
@@ -176,12 +180,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.ENHANCE_API_KEY}
               onChange={(e) => setFormData({...formData, ENHANCE_API_KEY: e.target.value})}
               placeholder="留空使用默认 OpenAI Key"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Base URL
             </label>
             <input
@@ -189,22 +193,24 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.ENHANCE_BASE_URL}
               onChange={(e) => setFormData({...formData, ENHANCE_BASE_URL: e.target.value})}
               placeholder="http://localhost:8317/v1"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
         </div>
       </div>
 
       {/* 感情文章润色模型配置 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl shadow-ios p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Cpu className="w-6 h-6 text-pink-600" />
-          <h3 className="text-xl font-semibold text-gray-800">感情文章润色模型配置</h3>
+          <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center">
+            <Cpu className="w-5 h-5 text-rose-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">感情文章润色模型配置</h3>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               模型名称
             </label>
             <input
@@ -212,12 +218,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.EMOTION_MODEL}
               onChange={(e) => setFormData({...formData, EMOTION_MODEL: e.target.value})}
               placeholder="gemini-2.5-pro"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               API Key (可选)
             </label>
             <input
@@ -225,12 +231,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.EMOTION_API_KEY}
               onChange={(e) => setFormData({...formData, EMOTION_API_KEY: e.target.value})}
               placeholder="留空使用默认 OpenAI Key"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Base URL
             </label>
             <input
@@ -238,22 +244,24 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.EMOTION_BASE_URL}
               onChange={(e) => setFormData({...formData, EMOTION_BASE_URL: e.target.value})}
               placeholder="http://localhost:8317/v1"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
         </div>
       </div>
 
       {/* 系统配置 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl shadow-ios p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Settings className="w-6 h-6 text-orange-600" />
-          <h3 className="text-xl font-semibold text-gray-800">系统配置</h3>
+          <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
+            <Settings className="w-5 h-5 text-orange-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">系统配置</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               最大并发用户数
             </label>
             <input
@@ -261,12 +269,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.MAX_CONCURRENT_USERS}
               onChange={(e) => setFormData({...formData, MAX_CONCURRENT_USERS: e.target.value})}
               placeholder="5"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               历史压缩阈值（字符）
             </label>
             <input
@@ -274,12 +282,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.HISTORY_COMPRESSION_THRESHOLD}
               onChange={(e) => setFormData({...formData, HISTORY_COMPRESSION_THRESHOLD: e.target.value})}
               placeholder="5000"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               压缩模型
             </label>
             <input
@@ -287,12 +295,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.COMPRESSION_MODEL}
               onChange={(e) => setFormData({...formData, COMPRESSION_MODEL: e.target.value})}
               placeholder="gemini-2.5-pro"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               压缩 API Key (可选)
             </label>
             <input
@@ -300,12 +308,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.COMPRESSION_API_KEY}
               onChange={(e) => setFormData({...formData, COMPRESSION_API_KEY: e.target.value})}
               placeholder="留空使用默认 OpenAI Key"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-mono"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               压缩 Base URL
             </label>
             <input
@@ -313,12 +321,12 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.COMPRESSION_BASE_URL}
               onChange={(e) => setFormData({...formData, COMPRESSION_BASE_URL: e.target.value})}
               placeholder="http://localhost:8317/v1"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               默认使用次数限制
             </label>
             <input
@@ -326,13 +334,13 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.DEFAULT_USAGE_LIMIT}
               onChange={(e) => setFormData({...formData, DEFAULT_USAGE_LIMIT: e.target.value})}
               placeholder="1"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
-            <p className="mt-1 text-xs text-gray-500">新用户的默认使用次数限制</p>
+            <p className="mt-1.5 text-xs text-gray-400">新用户的默认使用次数限制</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               段落跳过阈值（字符）
             </label>
             <input
@@ -340,9 +348,9 @@ const ConfigManager = ({ adminToken }) => {
               value={formData.SEGMENT_SKIP_THRESHOLD}
               onChange={(e) => setFormData({...formData, SEGMENT_SKIP_THRESHOLD: e.target.value})}
               placeholder="15"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
-            <p className="mt-1 text-xs text-gray-500">小于此字数的段落将被识别为标题并跳过</p>
+            <p className="mt-1.5 text-xs text-gray-400">小于此字数的段落将被识别为标题并跳过</p>
           </div>
         </div>
       </div>
@@ -352,7 +360,7 @@ const ConfigManager = ({ adminToken }) => {
         <button
           onClick={fetchConfig}
           disabled={loading}
-          className="flex items-center gap-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+          className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 hover:bg-gray-50 disabled:bg-gray-50 text-gray-700 rounded-xl transition-all active:scale-[0.98] font-medium shadow-sm"
         >
           <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           刷新
@@ -360,11 +368,11 @@ const ConfigManager = ({ adminToken }) => {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl transition-all active:scale-[0.98] font-semibold shadow-sm"
         >
           {saving ? (
             <>
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               保存中...
             </>
           ) : (
@@ -376,9 +384,10 @@ const ConfigManager = ({ adminToken }) => {
         </button>
       </div>
 
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <p className="text-sm text-green-800">
-          ✅ 配置修改后会立即生效，无需重启服务！
+      <div className="bg-green-50/50 border border-green-100 rounded-xl p-4">
+        <p className="text-sm font-medium text-green-800 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+          配置修改后会立即生效，无需重启服务！
         </p>
       </div>
     </div>

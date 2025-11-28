@@ -35,45 +35,11 @@ if settings.ADMIN_PASSWORD == "admin123":
     print("="*60 + "\n")
     # 仅警告,不强制退出 (开发环境可能需要)
 
-# 简单的内存速率限制器
-class SimpleRateLimiter:
-    def __init__(self):
-        self.requests: Dict[Tuple[str, str], list] = defaultdict(list)
-    
-    def check_limit(self, key: str, limit: int, window: int = 60):
-        """检查速率限制
-        Args:
-            key: 客户端标识(IP地址)
-            limit: 时间窗口内的最大请求数
-            window: 时间窗口(秒)
-        """
-        now = datetime.now()
-        # 清理过期记录
-        self.requests[key] = [
-            req_time for req_time in self.requests[key]
-            if now - req_time < timedelta(seconds=window)
-        ]
-        
-        # 检查是否超过限制
-        if len(self.requests[key]) >= limit:
-            raise HTTPException(
-                status_code=429,
-                detail=f"请求过于频繁,请在 {window} 秒后重试"
-            )
-        
-        # 记录本次请求
-        self.requests[key].append(now)
-
-rate_limiter = SimpleRateLimiter()
-
 app = FastAPI(
     title="AI 论文润色增强系统",
     description="高质量论文润色与原创性学术表达增强",
     version="1.0.0"
 )
-
-# 绑定速率限制器到应用
-app.state.rate_limiter = rate_limiter
 
 # 添加 Gzip 压缩中间件以减少响应体积
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -92,31 +58,7 @@ app.include_router(admin.router)
 app.include_router(prompts.router)
 app.include_router(optimization.router)
 
-# 速率限制中间件
-@app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
-    """对敏感端点应用速率限制"""
-    client_ip = request.client.host if request.client else "unknown"
-    
-    try:
-        # 登录接口: 每分钟最多5次
-        if request.url.path == "/api/admin/login" and request.method == "POST":
-            rate_limiter.check_limit(f"login:{client_ip}", limit=5, window=60)
-        
-        # 卡密验证接口: 每分钟最多10次
-        elif request.url.path == "/api/admin/verify-card-key" and request.method == "POST":
-            rate_limiter.check_limit(f"verify:{client_ip}", limit=10, window=60)
-    
-    except HTTPException as e:
-        # 速率限制异常,直接返回
-        from fastapi.responses import JSONResponse
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"detail": e.detail}
-        )
-    
-    response = await call_next(request)
-    return response
+# 速率限制中间件已移除
 
 
 @app.on_event("startup")

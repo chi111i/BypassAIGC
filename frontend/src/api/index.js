@@ -50,6 +50,10 @@ export const adminAPI = {
     api.delete(`/admin/users/${userId}`, {
       params: { admin_password: password },
     }),
+  stopSession: (sessionId, password) =>
+    api.post(`/admin/sessions/${sessionId}/stop`, null, {
+      params: { admin_password: password },
+    }),
   toggleUserActive: (userId, password) =>
     api.put(`/admin/users/${userId}/toggle-active`, null, {
       params: { admin_password: password },
@@ -95,6 +99,10 @@ export const optimizationAPI = {
     api.get(`/optimization/sessions/${sessionId}/changes`, {
       timeout: 20000, // 20秒超时
     }),
+  stopSession: (sessionId) =>
+    api.post(`/optimization/sessions/${sessionId}/stop`, null, {
+      timeout: 10000, // 10秒超时
+    }),
   exportSession: (sessionId, confirmation) =>
     api.post(`/optimization/sessions/${sessionId}/export`, confirmation, {
       timeout: 30000, // 30秒超时
@@ -103,10 +111,15 @@ export const optimizationAPI = {
     api.delete(`/optimization/sessions/${sessionId}`, {
       timeout: 10000, // 10秒超时
     }),
-    retryFailedSegments: (sessionId) =>
-      api.post(`/optimization/sessions/${sessionId}/retry`, null, {
-        timeout: 15000, // 15秒超时
-      }),
+  retryFailedSegments: (sessionId) =>
+    api.post(`/optimization/sessions/${sessionId}/retry`, null, {
+      timeout: 15000, // 15秒超时
+    }),
+  getStreamUrl: (sessionId) => {
+    const cardKey = localStorage.getItem('cardKey');
+    const baseUrl = api.defaults.baseURL || '/api';
+    return `${baseUrl}/optimization/sessions/${sessionId}/stream?card_key=${cardKey}`;
+  },
 };
 
 export default api;

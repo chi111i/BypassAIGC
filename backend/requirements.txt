@@ -14,3 +14,4 @@ passlib[bcrypt]==1.7.4
 alembic==1.13.1
 redis==5.0.1
 aioredis==2.0.1
+sse-starlette==3.0.3

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from sqlalchemy.orm import Session, defer
 from sqlalchemy import func, and_, case
 from typing import List
 import json
@@ -11,10 +11,12 @@ from app.schemas import (
 )
 from app.services.optimization_service import OptimizationService
 from app.services.concurrency import concurrency_manager
+from app.services.stream_manager import stream_manager
 from app.utils.auth import generate_session_id
 from datetime import datetime
 import asyncio
 from app.config import settings
+from sse_starlette.sse import EventSourceResponse
 
 router = APIRouter(prefix="/optimization", tags=["optimization"])
 
@@ -136,10 +138,23 @@ async def list_sessions(
     # 限制最大返回数量为100，避免一次性加载过多数据
     limit = min(limit, 100)
     
-    sessions = db.query(OptimizationSession).filter(
+    # 查询会话及其原始文本长度
+    results = db.query(
+        OptimizationSession,
+        func.length(OptimizationSession.original_text).label('original_char_count')
+    ).options(
+        defer(OptimizationSession.original_text),
+        defer(OptimizationSession.error_message)
+    ).filter(
         OptimizationSession.user_id == user.id
     ).order_by(OptimizationSession.created_at.desc()).limit(limit).offset(offset).all()
     
+    # 构造响应，手动注入 original_char_count
+    sessions = []
+    for session, char_count in results:
+        session.original_char_count = char_count or 0
+        sessions.append(session)
+        
     return sessions
 
 
@@ -198,6 +213,45 @@ async def get_session_progress(
         current_stage=session.current_stage,
         error_message=session.error_message
     )
+
+
+@router.get("/sessions/{session_id}/stream")
+async def stream_session_progress(
+    session_id: str,
+    request: Request,
+    card_key: str,  # 简单的鉴权，实际可能需要更严格的检查
+    db: Session = Depends(get_db)
+):
+    """流式获取会话进度和内容"""
+    # 验证用户权限
+    user = get_current_user(card_key, db)
+    session = db.query(OptimizationSession).filter(
+        OptimizationSession.session_id == session_id,
+        OptimizationSession.user_id == user.id
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    async def event_generator():
+        queue = await stream_manager.connect(session_id)
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                
+                # 从队列获取消息，设置超时以便检查连接状态
+                try:
+                    message = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    yield message
+                except asyncio.TimeoutError:
+                    # 发送心跳注释以保持连接活跃
+                    yield ": keep-alive\n\n"
+                    
+        finally:
+            await stream_manager.disconnect(session_id, queue)
+
+    return EventSourceResponse(event_generator())
 
 
 @router.get("/sessions/{session_id}/changes", response_model=List[ChangeLogResponse])
@@ -357,8 +411,8 @@ async def retry_session(
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
 
-    if session.status != "failed":
-        raise HTTPException(status_code=400, detail="仅可对失败的会话执行重试")
+    if session.status not in ["failed", "stopped"]:
+        raise HTTPException(status_code=400, detail="仅可对失败或已停止的会话执行重试")
 
     session.status = "queued"
     session.error_message = None
@@ -367,3 +421,31 @@ async def retry_session(
     background_tasks.add_task(run_optimization, session.id, db)
 
     return {"message": "已重新排队处理未完成段落"}
+
+
+@router.post("/sessions/{session_id}/stop")
+async def stop_session(
+    session_id: str,
+    card_key: str,
+    db: Session = Depends(get_db)
+):
+    """停止正在进行中的会话"""
+    user = get_current_user(card_key, db)
+
+    session = db.query(OptimizationSession).filter(
+        OptimizationSession.session_id == session_id,
+        OptimizationSession.user_id == user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    if session.status not in ["queued", "processing"]:
+        raise HTTPException(status_code=400, detail="只能停止排队中或处理中的会话")
+
+    # 更新状态为 stopped
+    session.status = "stopped"
+    session.error_message = "用户手动停止"
+    db.commit()
+
+    return {"message": "会话已停止"}

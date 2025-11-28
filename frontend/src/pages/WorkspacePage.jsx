@@ -192,33 +192,35 @@ const WorkspacePage = () => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 顶部导航栏 */}
-      <nav className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-ios-background">
+      {/* 顶部导航栏 - iOS Glass Style */}
+      <nav className="bg-white/80 backdrop-blur-xl border-b border-ios-separator sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <FileText className="w-8 h-8 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-800">
-                AI 论文润色增强系统
+          <div className="flex justify-between items-center h-[52px]">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-ios-blue rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-[17px] font-semibold text-black tracking-tight">
+                AI 论文润色增强
               </h1>
             </div>
             
             <div className="flex items-center gap-4">
               {/* 队列状态 */}
               {queueStatus && (
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-gray-500" />
-                    <span className="text-gray-600">
-                      {queueStatus.current_users}/{queueStatus.max_users} 使用中
+                <div className="flex items-center gap-3 text-[13px]">
+                  <div className="flex items-center gap-1.5 bg-gray-100 px-2 py-1 rounded-md">
+                    <Users className="w-3.5 h-3.5 text-ios-gray" />
+                    <span className="text-ios-gray font-medium">
+                      {queueStatus.current_users}/{queueStatus.max_users}
                     </span>
                   </div>
                   {queueStatus.queue_length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-orange-500" />
-                      <span className="text-orange-600">
-                        {queueStatus.queue_length} 人排队
+                    <div className="flex items-center gap-1.5 bg-orange-50 px-2 py-1 rounded-md">
+                      <Clock className="w-3.5 h-3.5 text-ios-orange" />
+                      <span className="text-ios-orange font-medium">
+                        {queueStatus.queue_length} 排队
                       </span>
                     </div>
                   )}
@@ -227,9 +229,8 @@ const WorkspacePage = () => {
               
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="text-ios-red text-[17px] hover:opacity-70 transition-opacity font-normal"
               >
-                <LogOut className="w-5 h-5" />
                 退出
               </button>
             </div>
@@ -237,105 +238,99 @@ const WorkspacePage = () => {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左侧 - 输入区域 */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-lg p-4 flex items-start gap-3">
-              <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium mb-1">处理模式说明</p>
-                <p>
-                  {processingMode === 'paper_polish' && '仅进行论文润色，提升文本的学术性和表达质量。'}
-                  {processingMode === 'paper_polish_enhance' && '先进行论文润色，然后自动进行原创性增强，两阶段处理。'}
-                  {processingMode === 'emotion_polish' && '专为感情文章设计，生成更自然、更具人性化的表达。'}
-                </p>
+            
+            {/* 说明卡片 */}
+            <div className="bg-white rounded-2xl shadow-ios overflow-hidden">
+              <div className="p-4 flex items-start gap-3 bg-blue-50/50">
+                <Info className="w-5 h-5 text-ios-blue flex-shrink-0 mt-0.5" />
+                <div className="text-[15px] text-black">
+                  <p className="font-semibold mb-1 text-ios-blue">当前模式说明</p>
+                  <p className="text-gray-700 leading-relaxed">
+                    {processingMode === 'paper_polish' && '仅进行论文润色，提升文本的学术性和表达质量。'}
+                    {processingMode === 'paper_polish_enhance' && '先进行论文润色，然后自动进行原创性增强，两阶段处理。'}
+                    {processingMode === 'emotion_polish' && '专为感情文章设计，生成更自然、更具人性化的表达。'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                输入文本内容
-              </h2>
+            <div className="bg-white rounded-2xl shadow-ios p-5">
+              <div className="h-[40px] flex items-center mb-2">
+                <h2 className="text-[20px] font-bold text-black tracking-tight pl-1">
+                  新建任务
+                </h2>
+              </div>
               
-              {/* 处理模式选择 */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  选择处理模式
+              {/* 处理模式选择 - iOS Segmented Control Style */}
+              <div className="mb-5">
+                <label className="block text-[13px] font-medium text-ios-gray mb-2 ml-1 uppercase tracking-wide">
+                  选择模式
                 </label>
-                <div className="space-y-2">
-                  <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="processingMode"
-                      value="paper_polish"
-                      checked={processingMode === 'paper_polish'}
-                      onChange={(e) => setProcessingMode(e.target.value)}
-                      className="mr-3"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-800">论文润色</div>
-                      <div className="text-sm text-gray-600">仅进行论文润色，提升学术表达质量</div>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="processingMode"
-                      value="paper_polish_enhance"
-                      checked={processingMode === 'paper_polish_enhance'}
-                      onChange={(e) => setProcessingMode(e.target.value)}
-                      className="mr-3"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-800">论文润色 + 论文增强</div>
-                      <div className="text-sm text-gray-600">先润色后增强，提升原创性和学术水平</div>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="processingMode"
-                      value="emotion_polish"
-                      checked={processingMode === 'emotion_polish'}
-                      onChange={(e) => setProcessingMode(e.target.value)}
-                      className="mr-3"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-800">感情文章润色</div>
-                      <div className="text-sm text-gray-600">适合今日头条等平台，生成更自然的表达</div>
-                    </div>
-                  </label>
+                <div className="space-y-3">
+                  {[
+                    { id: 'paper_polish', title: '论文润色', desc: '提升学术表达质量' },
+                    { id: 'paper_polish_enhance', title: '润色 + 增强', desc: '提升原创性与学术水平' },
+                    { id: 'emotion_polish', title: '感情文章润色', desc: '自然、人性化表达' }
+                  ].map((mode) => (
+                    <label
+                      key={mode.id}
+                      className={`flex items-center p-3.5 rounded-xl cursor-pointer transition-all border ${
+                        processingMode === mode.id
+                          ? 'bg-blue-50 border-ios-blue ring-1 ring-ios-blue/20'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="processingMode"
+                        value={mode.id}
+                        checked={processingMode === mode.id}
+                        onChange={(e) => setProcessingMode(e.target.value)}
+                        className="mr-3 w-5 h-5 text-ios-blue focus:ring-ios-blue border-gray-300"
+                      />
+                      <div>
+                        <div className={`font-semibold text-[15px] ${processingMode === mode.id ? 'text-ios-blue' : 'text-black'}`}>
+                          {mode.title}
+                        </div>
+                        <div className="text-[13px] text-ios-gray mt-0.5">
+                          {mode.desc}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </div>
               
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="在此粘贴您的内容..."
-                className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              />
-              
-              <div className="mt-4 flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  字数: {text.length}
+              <div className="relative">
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="在此粘贴您的内容..."
+                  className="w-full h-64 px-4 py-3 bg-gray-50 rounded-xl focus:bg-white focus:ring-2 focus:ring-ios-blue/20 transition-all text-[16px] leading-relaxed text-black placeholder-gray-400 border-none outline-none resize-none"
+                />
+                <div className="absolute bottom-3 right-3 text-[12px] text-ios-gray bg-white/80 px-2 py-1 rounded-md backdrop-blur-sm">
+                  {text.length} 字
                 </div>
-                
+              </div>
+              
+              <div className="mt-5 flex justify-end">
                 <button
                   onClick={handleStartOptimization}
                   disabled={!text.trim() || activeSession || isSubmitting}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-ios-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-8 rounded-xl transition-all active:scale-[0.98] shadow-sm text-[17px]"
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       提交中...
                     </>
                   ) : (
                     <>
-                      <Play className="w-5 h-5" />
+                      <Play className="w-5 h-5 fill-current" />
                       开始优化
                     </>
                   )}
@@ -345,10 +340,16 @@ const WorkspacePage = () => {
 
             {/* 活跃会话进度 */}
             {activeSession && sessions.find(s => s.session_id === activeSession) && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                  优化进度
-                </h2>
+              <div className="bg-white rounded-2xl shadow-ios p-5 border border-blue-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-[17px] font-bold text-black flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-ios-blue animate-pulse" />
+                    正在处理
+                  </h2>
+                  <span className="text-[13px] font-medium px-2 py-1 bg-blue-50 text-ios-blue rounded-md">
+                    进行中
+                  </span>
+                </div>
                 
                 {(() => {
                   const session = sessions.find(s => s.session_id === activeSession);
@@ -361,35 +362,37 @@ const WorkspacePage = () => {
                   return (
                     <div className="space-y-4">
                       <div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-gray-600">
-                            阶段: {getStageName(session.current_stage)}
+                        <div className="flex justify-between text-[13px] mb-2 font-medium">
+                          <span className="text-ios-gray">
+                            当前阶段: <span className="text-black">{getStageName(session.current_stage)}</span>
                           </span>
-                          <span className="font-medium text-blue-600">
+                          <span className="text-ios-blue">
                             {session.progress.toFixed(1)}%
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="w-full bg-gray-100 rounded-full h-2">
                           <div
-                            className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                            className="bg-ios-blue h-2 rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(0,122,255,0.3)]"
                             style={{ width: `${session.progress}%` }}
                           />
                         </div>
                       </div>
                       
-                      <div className="text-sm text-gray-600">
-                        处理中: 第 {session.current_position + 1} / {session.total_segments} 段
+                      <div className="flex justify-between items-center text-[13px]">
+                        <span className="text-ios-gray">
+                          进度: <span className="font-medium text-black">{session.current_position + 1}</span> / {session.total_segments} 段
+                        </span>
+                        
+                        {session.status === 'queued' && queueStatus?.your_position && (
+                          <div className="flex items-center gap-1.5 text-ios-orange">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>
+                              排队第 {queueStatus.your_position} 位
+                              (~{Math.ceil(queueStatus.estimated_wait_time / 60)}分)
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      
-                      {session.status === 'queued' && queueStatus?.your_position && (
-                        <div className="flex items-center gap-2 text-sm text-orange-600">
-                          <Clock className="w-4 h-4" />
-                          <span>
-                            队列位置: {queueStatus.your_position} 
-                            (预计等待 {Math.ceil(queueStatus.estimated_wait_time / 60)} 分钟)
-                          </span>
-                        </div>
-                      )}
                     </div>
                   );
                 })()}
@@ -399,82 +402,99 @@ const WorkspacePage = () => {
 
           {/* 右侧 - 历史会话 */}
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <History className="w-5 h-5 text-gray-600" />
-                <h2 className="text-lg font-semibold text-gray-800">
-                  历史会话
-                </h2>
+            <div className="bg-white rounded-2xl shadow-ios overflow-hidden flex flex-col h-[calc(100vh-140px)] sticky top-24">
+              <div className="p-5 border-b border-gray-100 bg-white/50 backdrop-blur-sm z-10 h-[72px] flex items-center">
+                <div className="flex items-center gap-2">
+                  <History className="w-5 h-5 text-ios-gray" />
+                  <h2 className="text-[20px] font-bold text-black tracking-tight">
+                    历史记录
+                  </h2>
+                </div>
               </div>
               
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar h-full">
                 {isLoadingSessions ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  <div className="flex items-center justify-center py-12">
+                    <div className="w-6 h-6 border-2 border-ios-gray/30 border-t-ios-gray rounded-full animate-spin" />
                   </div>
                 ) : sessions.length === 0 ? (
-                  <p className="text-gray-500 text-sm text-center py-8">
-                    暂无会话记录
-                  </p>
+                  <div className="text-center py-12 space-y-2">
+                    <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300">
+                      <History className="w-6 h-6" />
+                    </div>
+                    <p className="text-ios-gray text-sm">
+                      暂无会话记录
+                    </p>
+                  </div>
                 ) : (
                   sessions.map((session) => (
                     <div
                       key={session.id}
                       onClick={() => handleViewSession(session.session_id)}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer"
+                      className="group p-3 rounded-xl hover:bg-gray-50 transition-all cursor-pointer border border-transparent hover:border-gray-100 relative"
                     >
-                      <div className="flex items-start justify-between mb-2 gap-2">
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-start justify-between mb-1.5 gap-2">
+                        <div className="flex items-center gap-1.5">
                           {session.status === 'completed' && (
-                            <CheckCircle className="w-5 h-5 text-green-500" />
+                            <CheckCircle className="w-4 h-4 text-ios-green" />
                           )}
                           {session.status === 'processing' && (
-                            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                            <div className="w-4 h-4 border-2 border-ios-blue border-t-transparent rounded-full animate-spin" />
                           )}
                           {session.status === 'failed' && (
-                            <AlertCircle className="w-5 h-5 text-red-500" />
+                            <AlertCircle className="w-4 h-4 text-ios-red" />
                           )}
-                          <span className="text-sm font-medium text-gray-700">
+                          {session.status === 'stopped' && (
+                            <AlertCircle className="w-4 h-4 text-orange-500" />
+                          )}
+                          <span className={`text-[13px] font-medium ${
+                            session.status === 'completed' ? 'text-black' :
+                            session.status === 'processing' ? 'text-ios-blue' :
+                            session.status === 'failed' ? 'text-ios-red' :
+                            session.status === 'stopped' ? 'text-orange-600' : 'text-ios-gray'
+                          }`}>
                             {session.status === 'completed' && '已完成'}
                             {session.status === 'processing' && '处理中'}
                             {session.status === 'queued' && '排队中'}
                             {session.status === 'failed' && '失败'}
+                            {session.status === 'stopped' && '已停止'}
                           </span>
-                          {renderStatusAction(session)}
                         </div>
                         
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">
-                            {new Date(session.created_at).toLocaleDateString()}
-                          </span>
-                          <button
-                            onClick={(event) => handleDeleteSession(event, session)}
-                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" 
-                            title="删除会话"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <span className="text-[11px] text-ios-gray/70 font-medium">
+                          {new Date(session.created_at).toLocaleDateString()}
+                        </span>
                       </div>
                       
-                      <p className="text-sm text-gray-600 line-clamp-2">
+                      <p className="text-[13px] text-ios-gray leading-snug line-clamp-2 mb-2 pr-6">
                         {session.original_text?.substring(0, 100)}...
                       </p>
                       
                       {session.status === 'processing' && (
-                        <div className="mt-2">
-                          <div className="w-full bg-gray-200 rounded-full h-1.5">
-                            <div
-                              className="bg-blue-600 h-1.5 rounded-full"
-                              style={{ width: `${session.progress}%` }}
-                            />
-                          </div>
+                        <div className="w-full bg-gray-100 rounded-full h-1 mb-1">
+                          <div
+                            className="bg-ios-blue h-1 rounded-full"
+                            style={{ width: `${session.progress}%` }}
+                          />
                         </div>
                       )}
+
+                      {/* 操作按钮 - 悬停显示或移动端常显 */}
+                      <div className="flex items-center justify-between mt-1">
+                         {renderStatusAction(session)}
+                         <button
+                            onClick={(event) => handleDeleteSession(event, session)}
+                            className="p-1.5 text-gray-300 hover:text-ios-red hover:bg-red-50 rounded-lg transition-colors ml-auto"
+                            title="删除会话"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                      </div>
+
                       {session.status === 'failed' && session.current_position < session.total_segments && (
-                        <p className="text-xs text-red-500 mt-2">
-                          失败原因: {session.error_message || '网络超时，建议点击“继续处理”重试剩余段落。'}
-                        </p>
+                         <div className="text-[11px] text-ios-red bg-red-50 px-2 py-1 rounded mt-1">
+                           {session.error_message ? '发生错误' : '网络超时'}
+                         </div>
                       )}
                     </div>
                   ))

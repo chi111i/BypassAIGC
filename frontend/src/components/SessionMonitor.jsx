@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import { Activity, RefreshCw, Clock, User, FileText, TrendingUp, BarChart3, Zap, History } from 'lucide-react';
+import { Activity, RefreshCw, Clock, User, FileText, TrendingUp, BarChart3, Zap, History, Square } from 'lucide-react';
+import { adminAPI } from '../api';
 
 const SessionMonitor = ({ adminToken }) => {
   const [activeSessions, setActiveSessions] = useState([]);
@@ -25,6 +26,22 @@ const SessionMonitor = ({ adminToken }) => {
     }
   }, [autoRefresh, viewMode]);
 
+  const handleStopSession = async (sessionId) => {
+    if (!window.confirm('确定要强制停止该会话吗？')) {
+      return;
+    }
+    const password = prompt("请输入管理员密码以确认停止操作:");
+    if (!password) return;
+
+    try {
+      await adminAPI.stopSession(sessionId, password);
+      toast.success('会话已停止');
+      fetchActiveSessions();
+    } catch (error) {
+      toast.error('停止失败: ' + (error.response?.data?.detail || '未知错误'));
+    }
+  };
+
   const fetchActiveSessions = async () => {
     try {
       const response = await axios.get('/api/admin/sessions/active', {
@@ -39,7 +56,10 @@ const SessionMonitor = ({ adminToken }) => {
   };
 
   const fetchHistorySessions = async () => {
-    setLoading(true);
+    // 如果已经有数据，不显示全屏loading，提升体验
+    if (historySessions.length === 0) {
+      setLoading(true);
+    }
     try {
       const response = await axios.get('/api/admin/sessions', {
         headers: { Authorization: `Bearer ${adminToken}` },
@@ -166,37 +186,43 @@ const SessionMonitor = ({ adminToken }) => {
       {/* 统计卡片 */}
       {viewMode === 'active' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl shadow-ios p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm">活跃会话</p>
-                <p className="text-3xl font-bold mt-1">{activeSessions.length}</p>
+                <p className="text-sm font-medium text-gray-500 mb-1">活跃会话</p>
+                <p className="text-3xl font-bold text-gray-900 tracking-tight">{activeSessions.length}</p>
               </div>
-              <Activity className="w-12 h-12 text-blue-200" />
+              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                <Activity className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl shadow-ios p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm">处理中</p>
-                <p className="text-3xl font-bold mt-1">
+                <p className="text-sm font-medium text-gray-500 mb-1">处理中</p>
+                <p className="text-3xl font-bold text-gray-900 tracking-tight">
                   {activeSessions.filter(s => s.status === 'processing').length}
                 </p>
               </div>
-              <TrendingUp className="w-12 h-12 text-green-200" />
+              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-green-600" />
+              </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl shadow-ios p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-yellow-100 text-sm">排队中</p>
-                <p className="text-3xl font-bold mt-1">
+                <p className="text-sm font-medium text-gray-500 mb-1">排队中</p>
+                <p className="text-3xl font-bold text-gray-900 tracking-tight">
                   {activeSessions.filter(s => s.status === 'queued').length}
                 </p>
               </div>
-              <Clock className="w-12 h-12 text-yellow-200" />
+              <div className="w-12 h-12 bg-yellow-50 rounded-xl flex items-center justify-center">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
             </div>
           </div>
         </div>
@@ -204,57 +230,65 @@ const SessionMonitor = ({ adminToken }) => {
       
       {viewMode === 'history' && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl shadow-ios p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm">已完成</p>
-                <p className="text-3xl font-bold mt-1">
+                <p className="text-sm font-medium text-gray-500 mb-1">已完成</p>
+                <p className="text-3xl font-bold text-gray-900 tracking-tight">
                   {historySessions.filter(s => s.status === 'completed').length}
                 </p>
               </div>
-              <Activity className="w-12 h-12 text-green-200" />
+              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
+                <Activity className="w-6 h-6 text-green-600" />
+              </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl shadow-ios p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm">处理中</p>
-                <p className="text-3xl font-bold mt-1">
+                <p className="text-sm font-medium text-gray-500 mb-1">处理中</p>
+                <p className="text-3xl font-bold text-gray-900 tracking-tight">
                   {historySessions.filter(s => s.status === 'processing').length}
                 </p>
               </div>
-              <TrendingUp className="w-12 h-12 text-blue-200" />
+              <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl shadow-ios p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-red-100 text-sm">失败</p>
-                <p className="text-3xl font-bold mt-1">
+                <p className="text-sm font-medium text-gray-500 mb-1">失败</p>
+                <p className="text-3xl font-bold text-gray-900 tracking-tight">
                   {historySessions.filter(s => s.status === 'failed').length}
                 </p>
               </div>
-              <Activity className="w-12 h-12 text-red-200" />
+              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                <Activity className="w-6 h-6 text-red-600" />
+              </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-white rounded-2xl shadow-ios p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-100 text-sm">总会话数</p>
-                <p className="text-3xl font-bold mt-1">{historySessions.length}</p>
+                <p className="text-sm font-medium text-gray-500 mb-1">总会话数</p>
+                <p className="text-3xl font-bold text-gray-900 tracking-tight">{historySessions.length}</p>
               </div>
-              <BarChart3 className="w-12 h-12 text-purple-200" />
+              <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+                <BarChart3 className="w-6 h-6 text-purple-600" />
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* 会话列表 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h4 className="text-lg font-semibold text-gray-800 mb-4">
+      <div className="bg-white rounded-2xl shadow-ios p-6">
+        <h4 className="text-lg font-bold text-gray-900 mb-6">
           {viewMode === 'active' ? '实时会话' : '历史会话'}
         </h4>
         
@@ -263,15 +297,20 @@ const SessionMonitor = ({ adminToken }) => {
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (viewMode === 'active' ? activeSessions : historySessions).length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            {viewMode === 'active' ? '当前没有活跃会话' : '暂无历史会话'}
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Activity className="w-8 h-8 text-gray-300" />
+            </div>
+            <p className="text-gray-500 font-medium">
+              {viewMode === 'active' ? '当前没有活跃会话' : '暂无历史会话'}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
             {(viewMode === 'active' ? activeSessions : historySessions).map((session) => (
               <div
                 key={session.id || session.session_id}
-                className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                className="bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -288,10 +327,20 @@ const SessionMonitor = ({ adminToken }) => {
                         session.status === 'queued' ? 'bg-yellow-100 text-yellow-800' :
                         session.status === 'completed' ? 'bg-green-100 text-green-800' :
                         session.status === 'failed' ? 'bg-red-100 text-red-800' :
+                        session.status === 'stopped' ? 'bg-orange-100 text-orange-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {getStatusText(session.status)}
+                        {session.status === 'stopped' ? '已停止' : getStatusText(session.status)}
                       </span>
+                      {(session.status === 'processing' || session.status === 'queued') && (
+                        <button
+                          onClick={() => handleStopSession(session.session_id || session.id)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="强制停止"
+                        >
+                          <Square className="w-4 h-4 fill-current" />
+                        </button>
+                      )}
                       {session.processing_mode && (
                         <span className="px-2 py-1 text-xs font-medium rounded bg-indigo-100 text-indigo-800">
                           {session.processing_mode === 'paper_polish' ? '论文润色' :

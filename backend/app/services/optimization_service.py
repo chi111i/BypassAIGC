@@ -8,12 +8,14 @@ from app.models.models import (
     SessionHistory, ChangeLog
 )
 from app.services.ai_service import (
-    AIService, split_text_into_segments, 
+    AIService, split_text_into_segments,
     count_chinese_characters, count_text_length, get_default_polish_prompt,
     get_default_enhance_prompt, get_emotion_polish_prompt, get_compression_prompt
 )
 from app.services.concurrency import concurrency_manager
+from app.services.stream_manager import stream_manager
 from app.config import settings
+from starlette.concurrency import run_in_threadpool
 
 
 class OptimizationService:
@@ -66,13 +68,13 @@ class OptimizationService:
             # 重置错误状态
             self.session_obj.error_message = None
             self.session_obj.failed_segment_index = None
-            self.db.commit()
+            await run_in_threadpool(self.db.commit)
             
             # 获取并发权限
             acquired = await concurrency_manager.acquire(self.session_obj.session_id)
             if not acquired:
                 self.session_obj.status = "queued"
-                self.db.commit()
+                await run_in_threadpool(self.db.commit)
                 
                 # 等待获取权限
                 while not concurrency_manager.is_active(self.session_obj.session_id):
@@ -80,33 +82,44 @@ class OptimizationService:
             
             # 更新状态为处理中
             self.session_obj.status = "processing"
-            self.db.commit()
+            await run_in_threadpool(self.db.commit)
             
             # 检查是否已存在段落,避免重复创建
-            existing_segments = self.db.query(OptimizationSegment).filter(
-                OptimizationSegment.session_id == self.session_obj.id
-            ).order_by(OptimizationSegment.segment_index).all()
+            # 在每次循环前检查会话状态，如果被停止则中断执行
+            await run_in_threadpool(self.db.refresh, self.session_obj)
+            if self.session_obj.status == "stopped":
+                return
+
+            def get_existing_segments():
+                return self.db.query(OptimizationSegment).filter(
+                    OptimizationSegment.session_id == self.session_obj.id
+                ).order_by(OptimizationSegment.segment_index).all()
+            
+            existing_segments = await run_in_threadpool(get_existing_segments)
 
             if not existing_segments:
                 # 首次运行: 分割文本并创建段落记录
                 segments = split_text_into_segments(self.session_obj.original_text)
                 self.session_obj.total_segments = len(segments)
-                self.db.commit()
+                await run_in_threadpool(self.db.commit)
 
-                for idx, segment_text in enumerate(segments):
-                    segment = OptimizationSegment(
-                        session_id=self.session_obj.id,
-                        segment_index=idx,
-                        stage="polish",
-                        original_text=segment_text,
-                        status="pending"
-                    )
-                    self.db.add(segment)
-                self.db.commit()
+                def create_segments():
+                    for idx, segment_text in enumerate(segments):
+                        segment = OptimizationSegment(
+                            session_id=self.session_obj.id,
+                            segment_index=idx,
+                            stage="polish",
+                            original_text=segment_text,
+                            status="pending"
+                        )
+                        self.db.add(segment)
+                    self.db.commit()
+                
+                await run_in_threadpool(create_segments)
             else:
                 # 继续运行: 同步总段落数
                 self.session_obj.total_segments = len(existing_segments)
-                self.db.commit()
+                await run_in_threadpool(self.db.commit)
             
             # 根据处理模式执行不同的阶段
             processing_mode = self.session_obj.processing_mode or 'paper_polish_enhance'
@@ -129,12 +142,12 @@ class OptimizationService:
             self.session_obj.completed_at = datetime.utcnow()
             self.session_obj.progress = 100.0
             self.session_obj.failed_segment_index = None
-            self.db.commit()
+            await run_in_threadpool(self.db.commit)
             
         except Exception as e:
             self.session_obj.status = "failed"
             self.session_obj.error_message = str(e)
-            self.db.commit()
+            await run_in_threadpool(self.db.commit)
             raise
         finally:
             # 释放并发权限
@@ -143,7 +156,7 @@ class OptimizationService:
     async def _process_stage(self, stage: str):
         """处理单个阶段"""
         self.session_obj.current_stage = stage
-        self.db.commit()
+        await run_in_threadpool(self.db.commit)
         
         # 获取该阶段的提示词
         prompt = self._get_prompt(stage)
@@ -157,9 +170,12 @@ class OptimizationService:
             ai_service = self.enhance_service
         
         # 获取所有段落
-        segments = self.db.query(OptimizationSegment).filter(
-            OptimizationSegment.session_id == self.session_obj.id
-        ).order_by(OptimizationSegment.segment_index).all()
+        def get_segments():
+            return self.db.query(OptimizationSegment).filter(
+                OptimizationSegment.session_id == self.session_obj.id
+            ).order_by(OptimizationSegment.segment_index).all()
+        
+        segments = await run_in_threadpool(get_segments)
         
         # 历史会话 - 只包含AI的回复内容
         history: List[Dict[str, str]] = []
@@ -188,11 +204,17 @@ class OptimizationService:
         skip_threshold = max(settings.SEGMENT_SKIP_THRESHOLD, 0)
 
         for idx, segment in enumerate(segments[start_index:], start=start_index):
+            # 每次处理段落前检查会话状态
+            await run_in_threadpool(self.db.refresh, self.session_obj)
+            if self.session_obj.status == "stopped":
+                # 释放并发权限并退出
+                return
+
             # 更新进度（无论是否跳过都更新）
             self.session_obj.current_position = idx
             progress = ((idx + (0.5 if stage == "enhance" else 0)) / len(segments)) * 100
             self.session_obj.progress = progress
-            self.db.commit()
+            await run_in_threadpool(self.db.commit)
 
             # 若段落已成功处理，直接跳过
             if stage in ["polish", "emotion_polish"] and segment.polished_text:
@@ -202,7 +224,7 @@ class OptimizationService:
                     segment.enhanced_text = segment.polished_text or segment.original_text
                     segment.status = "completed"
                     segment.completed_at = segment.completed_at or datetime.utcnow()
-                    self.db.commit()
+                    await run_in_threadpool(self.db.commit)
                 continue
 
             try:
@@ -214,24 +236,44 @@ class OptimizationService:
                     segment.enhanced_text = segment.original_text
                     segment.completed_at = datetime.utcnow()
                     segment.stage = stage
-                    self.db.commit()
+                    await run_in_threadpool(self.db.commit)
                     continue
 
                 segment.status = "processing"
                 segment.stage = stage
-                self.db.commit()
+                await run_in_threadpool(self.db.commit)
                 
                 # 准备输入文本
                 input_text = segment.polished_text if stage == "enhance" else segment.original_text
                 
                 # 调用AI
                 async def execute_call():
+                    # 启用流式
+                    use_stream = True
+                    
                     if stage == "polish":
-                        return await ai_service.polish_text(input_text, prompt, history)
+                        response = await ai_service.polish_text(input_text, prompt, history, stream=use_stream)
                     elif stage == "emotion_polish":
-                        return await ai_service.polish_emotion_text(input_text, prompt, history)
+                        response = await ai_service.polish_emotion_text(input_text, prompt, history, stream=use_stream)
                     else:  # enhance
-                        return await ai_service.enhance_text(input_text, prompt, history)
+                        response = await ai_service.enhance_text(input_text, prompt, history, stream=use_stream)
+                    
+                    if use_stream:
+                        full_text = ""
+                        async for chunk in response:
+                            if chunk:
+                                full_text += chunk
+                                # 推送流式更新
+                                await stream_manager.broadcast(self.session_obj.session_id, {
+                                    "type": "content",
+                                    "segment_index": idx,
+                                    "stage": stage,
+                                    "content": chunk,
+                                    "full_text": full_text  # 可选:发送全量或增量，这里发送增量chunk，全量用于恢复
+                                })
+                        return full_text
+                    else:
+                        return response
 
                 output_text = await self._run_with_retry(idx, stage, execute_call)
 
@@ -242,10 +284,10 @@ class OptimizationService:
 
                 segment.status = "completed"
                 segment.completed_at = datetime.utcnow()
-                self.db.commit()
+                await run_in_threadpool(self.db.commit)
                 
                 # 记录变更
-                self._record_change(segment, input_text, output_text, stage)
+                await self._record_change(segment, input_text, output_text, stage)
                 
                 # 更新历史会话 - 只添加AI的回复内容
                 history.append({"role": "assistant", "content": output_text})
@@ -260,14 +302,14 @@ class OptimizationService:
                     total_chars = sum(count_chinese_characters(msg.get("content", "")) for msg in history)
                 
                 # 保存历史
-                self._save_history(history, stage, total_chars)
+                await self._save_history(history, stage, total_chars)
                 
             except Exception as e:
                 segment.status = "failed"
-                self.db.commit()
+                await run_in_threadpool(self.db.commit)
                 self.session_obj.failed_segment_index = idx
                 self.session_obj.error_message = str(e)
-                self.db.commit()
+                await run_in_threadpool(self.db.commit)
                 raise Exception(f"处理段落 {idx} 失败: {str(e)}")
 
     async def _run_with_retry(self, segment_index: int, stage: str, task):
@@ -348,23 +390,25 @@ class OptimizationService:
             }
         ]
     
-    def _save_history(self, history: List[Dict[str, str]], stage: str, char_count: int):
+    async def _save_history(self, history: List[Dict[str, str]], stage: str, char_count: int):
         """保存历史会话"""
-        history_obj = SessionHistory(
-            session_id=self.session_obj.id,
-            stage=stage,
-            history_data=json.dumps(history, ensure_ascii=False),
-            is_compressed=len(history) == 1 and history[0]["role"] == "system",
-            character_count=char_count
-        )
-        self.db.add(history_obj)
-        self.db.commit()
+        def save():
+            history_obj = SessionHistory(
+                session_id=self.session_obj.id,
+                stage=stage,
+                history_data=json.dumps(history, ensure_ascii=False),
+                is_compressed=len(history) == 1 and history[0]["role"] == "system",
+                character_count=char_count
+            )
+            self.db.add(history_obj)
+            self.db.commit()
+        await run_in_threadpool(save)
     
-    def _record_change(
-        self, 
-        segment: OptimizationSegment, 
-        before: str, 
-        after: str, 
+    async def _record_change(
+        self,
+        segment: OptimizationSegment,
+        before: str,
+        after: str,
         stage: str
     ):
         """记录变更"""
@@ -375,27 +419,30 @@ class OptimizationService:
             "changed": before != after
         }
         
-        existing_log = self.db.query(ChangeLog).filter(
-            ChangeLog.session_id == self.session_obj.id,
-            ChangeLog.segment_index == segment.segment_index,
-            ChangeLog.stage == stage
-        ).order_by(ChangeLog.created_at.desc()).first()
+        def record():
+            existing_log = self.db.query(ChangeLog).filter(
+                ChangeLog.session_id == self.session_obj.id,
+                ChangeLog.segment_index == segment.segment_index,
+                ChangeLog.stage == stage
+            ).order_by(ChangeLog.created_at.desc()).first()
 
-        serialized_detail = json.dumps(changes, ensure_ascii=False)
+            serialized_detail = json.dumps(changes, ensure_ascii=False)
 
-        if existing_log:
-            # 如果之前已经生成过同一段落同一阶段的记录，直接更新内容避免重复条目
-            existing_log.before_text = before
-            existing_log.after_text = after
-            existing_log.changes_detail = serialized_detail
-        else:
-            change_log = ChangeLog(
-                session_id=self.session_obj.id,
-                segment_index=segment.segment_index,
-                stage=stage,
-                before_text=before,
-                after_text=after,
-                changes_detail=serialized_detail
-            )
-            self.db.add(change_log)
-        self.db.commit()
+            if existing_log:
+                # 如果之前已经生成过同一段落同一阶段的记录，直接更新内容避免重复条目
+                existing_log.before_text = before
+                existing_log.after_text = after
+                existing_log.changes_detail = serialized_detail
+            else:
+                change_log = ChangeLog(
+                    session_id=self.session_obj.id,
+                    segment_index=segment.segment_index,
+                    stage=stage,
+                    before_text=before,
+                    after_text=after,
+                    changes_detail=serialized_detail
+                )
+                self.db.add(change_log)
+            self.db.commit()
+        
+        await run_in_threadpool(record)

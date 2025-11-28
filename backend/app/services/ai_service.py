@@ -1,7 +1,7 @@
 from typing import List, Dict, Optional
-from urllib.parse import urljoin, urlparse
-import httpx
+import json
 import re
+from openai import AsyncOpenAI
 from app.config import settings
 
 
@@ -17,11 +17,46 @@ class AIService:
         self.model = model
         self.api_key = api_key or settings.OPENAI_API_KEY
         self.base_url = (base_url or settings.OPENAI_BASE_URL).rstrip("/")
-        self._chat_endpoint = urljoin(f"{self.base_url}/", "chat/completions")
+        
+        # 初始化 OpenAI 客户端
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=60.0
+        )
+        
         # 启用所有API请求的日志记录
         self._enable_logging = True
-        print(f"[INFO] AI Service 初始化成功: model={model}, endpoint={self._chat_endpoint}")
+        print(f"[INFO] AI Service 初始化成功: model={model}, base_url={self.base_url}")
     
+    async def stream_complete(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None
+    ):
+        """调用AI完成（流式）"""
+        try:
+            if self._enable_logging:
+                print(f"[INFO] Starting stream request to {self.base_url} model={self.model}", flush=True)
+
+            stream = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True
+            )
+
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            if self._enable_logging:
+                print(f"[AI ERROR] Stream Exception: {str(e)}", flush=True)
+            raise Exception(f"AI流式调用失败: {str(e)}")
+
     async def complete(
         self,
         messages: List[Dict[str, str]],
@@ -30,82 +65,32 @@ class AIService:
     ) -> str:
         """调用AI完成"""
         try:
-            payload: Dict[str, object] = {
-                "model": self.model,
-                "messages": messages,
-                "temperature": temperature
-            }
-            if max_tokens is not None:
-                payload["max_tokens"] = max_tokens
-
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-
-            # 记录请求日志（所有API）
+            # 记录请求日志
             if self._enable_logging:
-                masked_headers = headers.copy()
-                if "Authorization" in masked_headers:
-                    # 只显示API key的前8位和后4位
-                    full_key = masked_headers["Authorization"].replace("Bearer ", "")
-                    if len(full_key) > 12:
-                        masked_key = f"{full_key[:8]}...{full_key[-4:]}"
-                    else:
-                        masked_key = "***"
-                    masked_headers["Authorization"] = f"Bearer {masked_key}"
-                
                 print("\n" + "="*80, flush=True)
-                print("[AI REQUEST] URL:", self._chat_endpoint, flush=True)
+                print("[AI REQUEST] Base URL:", self.base_url, flush=True)
                 print("[AI REQUEST] Model:", self.model, flush=True)
-                print("[AI REQUEST] Headers:", masked_headers, flush=True)
-                print("[AI REQUEST] Payload:", payload, flush=True)
                 print("="*80 + "\n", flush=True)
 
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    self._chat_endpoint,
-                    json=payload,
-                    headers=headers
-                )
-                response.raise_for_status()
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=False
+            )
 
-            # 记录响应日志（所有API）
-            if self._enable_logging:
-                response_data = response.json()
-                print("\n" + "="*80, flush=True)
-                print("[AI RESPONSE] Status:", response.status_code, flush=True)
-                print("[AI RESPONSE] Model:", response_data.get("model", "N/A"), flush=True)
-                if "usage" in response_data:
-                    print("[AI RESPONSE] Token Usage:", response_data["usage"], flush=True)
-                print("[AI RESPONSE] Body:", response.text, flush=True)
-                print("="*80 + "\n", flush=True)
-
-            data = response.json()
-            choices = data.get("choices")
-            if not choices:
-                raise Exception("AI调用失败: 返回结果中缺少choices字段")
-
-            message = choices[0].get("message", {})
-            content = message.get("content")
-            if content is None:
-                raise Exception("AI调用失败: 返回结果中缺少content字段")
-
-            return content
-        except httpx.HTTPStatusError as http_err:
+            # 记录响应日志
             if self._enable_logging:
                 print("\n" + "="*80, flush=True)
-                print("[AI ERROR] HTTP Status Error", flush=True)
-                print("[AI ERROR] Status Code:", http_err.response.status_code, flush=True)
-                print("[AI ERROR] Response Body:", http_err.response.text, flush=True)
+                print("[AI RESPONSE] ID:", response.id, flush=True)
+                if response.usage:
+                    print("[AI RESPONSE] Token Usage:", response.usage.model_dump(), flush=True)
+                print("[AI RESPONSE] Content:", response.choices[0].message.content, flush=True)
                 print("="*80 + "\n", flush=True)
-            raise Exception(f"AI调用失败: {http_err.response.status_code} {http_err.response.text}")
-        except httpx.HTTPError as http_err:
-            if self._enable_logging:
-                print("\n" + "="*80, flush=True)
-                print("[AI ERROR] HTTP Error:", str(http_err), flush=True)
-                print("="*80 + "\n", flush=True)
-            raise Exception(f"AI调用失败: 网络请求错误 {str(http_err)}")
+
+            return response.choices[0].message.content or ""
+
         except Exception as e:
             if self._enable_logging:
                 print("\n" + "="*80, flush=True)
@@ -117,8 +102,9 @@ class AIService:
         self,
         text: str,
         prompt: str,
-        history: Optional[List[Dict[str, str]]] = None
-    ) -> str:
+        history: Optional[List[Dict[str, str]]] = None,
+        stream: bool = False
+    ):
         """润色文本"""
         messages = (history or []).copy()
         messages.append({
@@ -130,14 +116,17 @@ class AIService:
             "content": f"\n\n{text}"
         })
         
+        if stream:
+            return self.stream_complete(messages)
         return await self.complete(messages)
     
     async def enhance_text(
         self,
         text: str,
         prompt: str,
-        history: Optional[List[Dict[str, str]]] = None
-    ) -> str:
+        history: Optional[List[Dict[str, str]]] = None,
+        stream: bool = False
+    ):
         """增强文本原创性和学术表达"""
         messages = (history or []).copy()
         messages.append({
@@ -149,14 +138,17 @@ class AIService:
             "content": f"\n\n{text}"
         })
         
+        if stream:
+            return self.stream_complete(messages)
         return await self.complete(messages)
     
     async def polish_emotion_text(
         self,
         text: str,
         prompt: str,
-        history: Optional[List[Dict[str, str]]] = None
-    ) -> str:
+        history: Optional[List[Dict[str, str]]] = None,
+        stream: bool = False
+    ):
         """感情文章润色"""
         messages = (history or []).copy()
         messages.append({
@@ -168,6 +160,8 @@ class AIService:
             "content": f"\n\n{text}"
         })
         
+        if stream:
+            return self.stream_complete(messages)
         return await self.complete(messages)
     
     async def compress_history(
@@ -566,7 +560,7 @@ def get_emotion_polish_prompt() -> str:
 -   **善用标点来表演：**
     -   **冒号 (`:`)** 用于引出解释或“揭露真相”：`Afterall they can say: "Look...`
     -   **双破折号 (`--`)** 用于插入尖锐的旁白或转折：`...it doesn't work like that.`
-    -   **斜体 (`*word*`)** 用于模拟说话时的重音，这是非用不可的：`It *is* obvious...`, `*also* sees it as valid...`
+
 
 #### 2. 词汇与语法：拥抱“真实世界的凌乱”
 -   **强制性的口语化：** `it's`, `aren't`, `they'd`, `gonna`, `ain't` 是必须的。`tricky` 优于 `difficult`。`make it stick` 优于 `succeed`。
