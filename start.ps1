@@ -64,21 +64,21 @@ function Setup-Environment {
     # 检查 Python
     Write-ColorOutput "[1/5] 检查 Python..." "Yellow"
     try {
-        $pythonVersion = python3 --version 2>&1
-        if ($pythonVersion -match "python3 (\d+)\.(\d+)") {
+        $pythonVersion = python --version 2>&1
+        if ($pythonVersion -match "python (\d+)\.(\d+)") {
             $major = [int]$matches[1]
             $minor = [int]$matches[2]
             if ($major -ge 3 -and $minor -ge 10) {
                 Write-ColorOutput "✓ $pythonVersion" "Green"
             } else {
-                Write-ColorOutput "× python3 版本需要 3.10 或更高，当前: $pythonVersion" "Red"
+                Write-ColorOutput "× python 版本需要 3.10 或更高，当前: $pythonVersion" "Red"
                 Write-ColorOutput "请从 https://www.python.org/downloads/ 下载安装" "Yellow"
                 pause
                 return
             }
         }
     } catch {
-        Write-ColorOutput "× python3 未安装" "Red"
+        Write-ColorOutput "× python 未安装" "Red"
         Write-ColorOutput "请从 https://www.python.org/downloads/ 下载安装" "Yellow"
         pause
         return
@@ -109,8 +109,8 @@ function Setup-Environment {
     # 创建后端虚拟环境
     Write-ColorOutput "`n[3/5] 配置后端环境..." "Yellow"
     if (-not (Test-Path "backend\venv")) {
-        Write-ColorOutput "创建 python3 虚拟环境..." "Cyan"
-        python3 -m venv backend\venv
+        Write-ColorOutput "创建 python 虚拟环境..." "Cyan"
+        python -m venv backend\venv
         if ($LASTEXITCODE -ne 0) {
             Write-ColorOutput "× 创建虚拟环境失败" "Red"
             pause
@@ -250,7 +250,7 @@ function Start-AllServices {
     }
     
     Write-ColorOutput "[1/2] 启动后端服务..." "Green"
-    Start-Process $pwshPath -ArgumentList "-NoProfile", "-NoExit", "-Command", "cd '$PWD\backend'; .\venv\Scripts\python3.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    Start-Process $pwshPath -ArgumentList "-NoProfile", "-NoExit", "-Command", "cd '$PWD\backend'; .\venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     
     Write-ColorOutput "等待后端启动..." "Cyan"
     Start-Sleep -Seconds 3
@@ -297,7 +297,7 @@ function Start-Backend {
     Write-ColorOutput "按 Ctrl+C 停止服务`n" "Yellow"
     
     Push-Location backend
-    & .\venv\Scripts\python3.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    & .\venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     Pop-Location
 }
 
@@ -385,10 +385,10 @@ function Verify-Installation {
     # 检查 Python
     Write-ColorOutput "[1/7] 检查 Python..." "Yellow"
     try {
-        $pythonVersion = python3 --version 2>&1
+        $pythonVersion = python --version 2>&1
         Write-ColorOutput "✓ $pythonVersion" "Green"
     } catch {
-        Write-ColorOutput "× python3 未安装" "Red"
+        Write-ColorOutput "× python 未安装" "Red"
         $allOk = $false
     }
     
@@ -489,7 +489,7 @@ function Verify-Database {
     
     Write-ColorOutput "运行数据库验证脚本..." "Cyan"
     Push-Location backend
-    & .\venv\Scripts\python3.exe init_db.py
+    & .\venv\Scripts\python.exe init_db.py
     $exitCode = $LASTEXITCODE
     Pop-Location
     
