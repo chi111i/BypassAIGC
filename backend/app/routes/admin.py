@@ -11,6 +11,7 @@ from app.config import reload_settings, settings
 from app.database import get_db
 from app.models.models import (
     ChangeLog,
+    CustomPrompt,
     OptimizationSegment,
     OptimizationSession,
     SessionHistory,
@@ -53,6 +54,19 @@ class CardKeyCreate(BaseModel):
 
 class CardKeyVerify(BaseModel):
     card_key: str
+
+
+class AdminPromptCreate(BaseModel):
+    name: str
+    type: str  # 'polish' 或 'enhance'
+    content: str
+    is_system_default: bool = False
+
+
+class AdminPromptUpdate(BaseModel):
+    name: Optional[str] = None
+    content: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 ALLOWED_TABLES: Dict[str, Type] = {
@@ -851,3 +865,119 @@ async def delete_table_record(
     db.delete(record)
     db.commit()
     return {"message": "记录已删除"}
+
+
+# ==================== Admin Prompts Management ====================
+
+@router.get("/prompts")
+async def get_admin_prompts(
+    _: str = Depends(get_admin_from_token),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """获取所有提示词（管理员视图）"""
+    prompts = db.query(CustomPrompt).order_by(
+        CustomPrompt.is_system.desc(),
+        CustomPrompt.created_at.desc()
+    ).all()
+    
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "type": p.stage,
+            "content": p.content,
+            "is_system_default": p.is_system,
+            "is_active": p.is_active,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        }
+        for p in prompts
+    ]
+
+
+@router.post("/prompts")
+async def create_admin_prompt(
+    data: AdminPromptCreate,
+    _: str = Depends(get_admin_from_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """创建新提示词（管理员）"""
+    # 验证类型
+    if data.type not in ["polish", "enhance"]:
+        raise HTTPException(status_code=400, detail="类型必须是 'polish' 或 'enhance'")
+    
+    prompt = CustomPrompt(
+        name=data.name,
+        stage=data.type,
+        content=data.content,
+        is_system=data.is_system_default,
+        is_default=data.is_system_default,
+        is_active=True,
+    )
+    
+    db.add(prompt)
+    db.commit()
+    db.refresh(prompt)
+    
+    return {
+        "id": prompt.id,
+        "name": prompt.name,
+        "type": prompt.stage,
+        "content": prompt.content,
+        "is_system_default": prompt.is_system,
+        "is_active": prompt.is_active,
+        "created_at": prompt.created_at.isoformat() if prompt.created_at else None,
+    }
+
+
+@router.put("/prompts/{prompt_id}")
+async def update_admin_prompt(
+    prompt_id: int,
+    data: AdminPromptUpdate,
+    _: str = Depends(get_admin_from_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """更新提示词（管理员）"""
+    prompt = db.query(CustomPrompt).filter(CustomPrompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="提示词不存在")
+    
+    if data.name is not None:
+        prompt.name = data.name
+    if data.content is not None:
+        prompt.content = data.content
+    if data.is_active is not None:
+        prompt.is_active = data.is_active
+    
+    db.commit()
+    db.refresh(prompt)
+    
+    return {
+        "id": prompt.id,
+        "name": prompt.name,
+        "type": prompt.stage,
+        "content": prompt.content,
+        "is_system_default": prompt.is_system,
+        "is_active": prompt.is_active,
+        "updated_at": prompt.updated_at.isoformat() if prompt.updated_at else None,
+    }
+
+
+@router.delete("/prompts/{prompt_id}")
+async def delete_admin_prompt(
+    prompt_id: int,
+    _: str = Depends(get_admin_from_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, str]:
+    """删除提示词（管理员）"""
+    prompt = db.query(CustomPrompt).filter(CustomPrompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="提示词不存在")
+    
+    if prompt.is_system:
+        raise HTTPException(status_code=400, detail="系统默认提示词不能删除")
+    
+    db.delete(prompt)
+    db.commit()
+    
+    return {"message": "提示词已删除"}
