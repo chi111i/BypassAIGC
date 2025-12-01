@@ -53,10 +53,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
-app.include_router(admin.router)
-app.include_router(prompts.router)
-app.include_router(optimization.router)
+# 注册路由（添加 /api 前缀，与 backend/app/main.py 保持一致）
+app.include_router(admin.router, prefix="/api")
+app.include_router(prompts.router, prefix="/api")
+app.include_router(optimization.router, prefix="/api")
 
 # 速率限制中间件已移除
 

@@ -43,7 +43,7 @@ backend_path = os.path.join(APP_DIR, 'backend') if not getattr(sys, 'frozen', Fa
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -95,10 +95,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册 API 路由
-app.include_router(admin.router)
-app.include_router(prompts.router)
-app.include_router(optimization.router)
+# 注册 API 路由（添加 /api 前缀，与 backend/app/main.py 保持一致）
+app.include_router(admin.router, prefix="/api")
+app.include_router(prompts.router, prefix="/api")
+app.include_router(optimization.router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -211,9 +211,9 @@ if os.path.exists(STATIC_DIR):
     @app.get("/{file_path:path}")
     async def serve_static(file_path: str):
         """服务其他静态文件"""
-        # 如果是 API 路径，跳过
+        # 如果是 API 路径，抛出 404 让 FastAPI 正确处理
         if file_path.startswith('api/') or file_path.startswith('docs') or file_path.startswith('openapi'):
-            return {"error": "Not found"}
+            raise HTTPException(status_code=404, detail="Not found")
         
         full_path = os.path.join(STATIC_DIR, file_path)
         if os.path.exists(full_path) and os.path.isfile(full_path):
@@ -224,7 +224,7 @@ if os.path.exists(STATIC_DIR):
         if os.path.exists(index_file):
             return FileResponse(index_file)
         
-        return {"error": "File not found"}
+        raise HTTPException(status_code=404, detail="File not found")
 else:
     @app.get("/")
     async def root():
