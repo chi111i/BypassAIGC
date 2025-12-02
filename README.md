@@ -38,7 +38,7 @@ gptzero
    - JWT 密钥（SECRET_KEY）
 
 4. 再次运行程序，将自动打开浏览器访问 http://localhost:8000
-5. 访问 http://localhost:3000/admin后台创建卡密。
+5. 访问 http://localhost:3000/admin 后台创建卡密。
 > 💡 提示：数据库文件 `ai_polish.db` 和配置文件 `.env` 都保存在可执行文件同目录，方便备份和迁移。
 
 ### 方式二：使用启动脚本
@@ -475,6 +475,7 @@ git push origin v1.0.0
 Creative Commons (CC BY-NC-SA 4.0)
 
 [![Star History Chart](https://api.star-history.com/svg?repos=chi111i/BypassAIGC&type=Date)](https://star-history.com/#chi111i/BypassAIGC)
+
 
 
 
