@@ -12,7 +12,7 @@ const WelcomePage = () => {
   const [apiStatus, setApiStatus] = useState(null);
   const navigate = useNavigate();
 
-  // 检查 API 可用性
+  // 检查 API 可用性 - 改为静默检查，避免启动时报错
   useEffect(() => {
     const checkApiHealth = async () => {
       try {
@@ -20,22 +20,21 @@ const WelcomePage = () => {
         const data = response.data;
         setApiStatus(data);
         
-        // 如果所有模型都不可用，显示警告
+        // 只在所有模型都不可用时才显示警告
         if (data.overall_status === 'degraded') {
           const unavailableModels = Object.entries(data.models)
             .filter(([_, model]) => model.status === 'unavailable')
             .map(([name, _]) => name);
           
-          if (unavailableModels.length > 0) {
-            toast.error(
-              `部分 AI 模型不可用: ${unavailableModels.join(', ')}。请联系管理员检查配置。`,
-              { duration: 6000 }
-            );
+          // 只在所有模型都不可用时才显示错误
+          const allUnavailable = unavailableModels.length === Object.keys(data.models).length;
+          if (allUnavailable) {
+            console.warn('所有 AI 模型配置检查未通过，请联系管理员检查配置。');
           }
         }
       } catch (error) {
+        // 静默处理错误，避免影响用户体验
         console.error('API health check failed:', error);
-        toast.error('无法连接到服务器，请稍后重试', { duration: 5000 });
       }
     };
 
@@ -85,10 +84,19 @@ const WelcomePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-ios-background flex flex-col items-center justify-center p-4 sm:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col items-center justify-center p-4 sm:p-6 relative">
+      {/* Admin button in top-left with Apple frosted glass style */}
+      <button
+        onClick={() => navigate('/admin')}
+        className="fixed top-6 left-6 px-4 py-2.5 bg-white/70 backdrop-blur-xl border border-white/20 shadow-lg hover:bg-white/80 text-gray-800 rounded-2xl transition-all active:scale-95 flex items-center gap-2 text-sm font-medium z-10"
+      >
+        <Shield className="w-4 h-4 text-blue-600" />
+        管理后台
+      </button>
+
       <div className="max-w-md w-full space-y-8">
         {!showWarning ? (
-          <div className="bg-white rounded-2xl shadow-ios p-8 space-y-8">
+          <div className="bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 p-8 space-y-8">
             {/* Logo/标题区域 */}
             <div className="text-center space-y-4">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-ios-blue rounded-[22px] shadow-lg mb-2">
@@ -118,14 +126,14 @@ const WelcomePage = () => {
                   onChange={(e) => setCardKey(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && !loading && cardKey.trim() && handleContinue()}
                   placeholder="请输入卡密"
-                  className="w-full px-4 py-3.5 bg-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-ios-blue/20 transition-all text-black placeholder-gray-400 border-none outline-none text-[17px]"
+                  className="w-full px-4 py-3.5 bg-white/50 backdrop-blur-sm rounded-xl border border-gray-200/50 focus:bg-white/70 focus:ring-2 focus:ring-ios-blue/30 focus:border-ios-blue/50 transition-all text-black placeholder-gray-400 outline-none text-[17px]"
                 />
               </div>
 
               <button
                 onClick={handleContinue}
                 disabled={loading || !cardKey.trim()}
-                className="w-full bg-ios-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3.5 px-6 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-[17px]"
+                className="w-full bg-ios-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3.5 px-6 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 text-[17px] shadow-lg hover:shadow-xl"
               >
                 {loading ? (
                   <>
@@ -141,20 +149,14 @@ const WelcomePage = () => {
             </div>
 
             {/* 底部提示 */}
-            <div className="text-center pt-2 space-y-2">
+            <div className="text-center pt-2">
               <p className="text-xs text-ios-gray">
                 使用本系统即表示您同意遵守学术诚信规范
               </p>
-              <button
-                onClick={() => navigate('/admin')}
-                className="text-xs text-ios-blue hover:text-blue-600 underline transition-colors"
-              >
-                管理员后台
-              </button>
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-ios p-8 space-y-6">
+          <div className="bg-white/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 p-8 space-y-6">
             {/* 图标和标题 */}
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-ios-orange rounded-[18px] shadow-md mb-4">

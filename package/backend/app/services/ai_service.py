@@ -18,16 +18,20 @@ class AIService:
         self.api_key = api_key or settings.OPENAI_API_KEY
         self.base_url = (base_url or settings.OPENAI_BASE_URL).rstrip("/")
         
-        # 初始化 OpenAI 客户端
-        self.client = AsyncOpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            timeout=60.0
-        )
-        
-        # 启用所有API请求的日志记录
-        self._enable_logging = True
-        print(f"[INFO] AI Service 初始化成功: model={model}, base_url={self.base_url}")
+        try:
+            # 初始化 OpenAI 客户端
+            self.client = AsyncOpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=60.0
+            )
+            
+            # 启用所有API请求的日志记录
+            self._enable_logging = True
+            print(f"[INFO] AI Service 初始化成功: model={model}, base_url={self.base_url}")
+        except Exception as e:
+            print(f"[ERROR] AI Service 初始化失败: {str(e)}")
+            raise Exception(f"AI Service 初始化失败: {str(e)}")
     
     async def stream_complete(
         self,
@@ -76,6 +80,7 @@ class AIService:
         except Exception as e:
             if self._enable_logging:
                 print(f"[STREAM ERROR] Exception: {str(e)}", flush=True)
+                print(f"[STREAM ERROR] Exception Type: {type(e).__name__}", flush=True)
             raise Exception(f"AI流式调用失败: {str(e)}")
 
     async def complete(

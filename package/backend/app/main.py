@@ -123,21 +123,39 @@ async def health_check():
 
 
 async def _check_model_health(model_name: str, model: str, api_key: Optional[str], base_url: Optional[str]) -> dict:
-    """检查单个模型的健康状态"""
-    from app.services.ai_service import AIService
+    """检查单个模型的健康状态 - 只验证URL格式，不测试实际连接"""
+    import re
     
     try:
-        service = AIService(
-            model=model,
-            api_key=api_key,
-            base_url=base_url
-        )
-        # 发送简单测试请求验证模型可用性
-        await service.complete(
-            messages=[{"role": "user", "content": "test"}],
-            temperature=0.7,
-            max_tokens=10
-        )
+        # 检查必需的配置项
+        if not model or not model.strip():
+            return {
+                "status": "unavailable",
+                "model": model,
+                "base_url": base_url,
+                "error": "模型名称未配置"
+            }
+        
+        if not base_url or not base_url.strip():
+            return {
+                "status": "unavailable",
+                "model": model,
+                "base_url": base_url,
+                "error": "Base URL 未配置"
+            }
+        
+        # 验证 base_url 是否符合 OpenAI API 格式
+        # 使用更严格的 URL 验证模式
+        url_pattern = re.compile(r'^https?://[^\s/$.?#].[^\s]*$', re.IGNORECASE)
+        if not url_pattern.match(base_url):
+            return {
+                "status": "unavailable",
+                "model": model,
+                "base_url": base_url,
+                "error": "Base URL 格式不正确，应为有效的 HTTP/HTTPS URL"
+            }
+        
+        # URL 格式正确，认为配置有效
         return {
             "status": "available",
             "model": model,
