@@ -32,34 +32,48 @@ class OptimizationService:
         self.compression_service: Optional[AIService] = None
     
     def _init_ai_services(self):
-        """初始化AI服务"""
-        # 润色服务
-        self.polish_service = AIService(
-            model=self.session_obj.polish_model or settings.POLISH_MODEL,
-            api_key=self.session_obj.polish_api_key or settings.POLISH_API_KEY,
-            base_url=self.session_obj.polish_base_url or settings.POLISH_BASE_URL
-        )
+        """初始化AI服务
         
-        # 增强服务
-        self.enhance_service = AIService(
-            model=self.session_obj.enhance_model or settings.ENHANCE_MODEL,
-            api_key=self.session_obj.enhance_api_key or settings.ENHANCE_API_KEY,
-            base_url=self.session_obj.enhance_base_url or settings.ENHANCE_BASE_URL
-        )
-        
-        # 感情文章润色服务
-        self.emotion_service = AIService(
-            model=self.session_obj.emotion_model or settings.POLISH_MODEL,
-            api_key=self.session_obj.emotion_api_key or settings.POLISH_API_KEY,
-            base_url=self.session_obj.emotion_base_url or settings.POLISH_BASE_URL
-        )
-        
-        # 压缩服务
-        self.compression_service = AIService(
-            model=settings.COMPRESSION_MODEL,
-            api_key=settings.COMPRESSION_API_KEY or settings.OPENAI_API_KEY,
-            base_url=settings.COMPRESSION_BASE_URL or settings.OPENAI_BASE_URL
-        )
+        改进的初始化逻辑：
+        1. 验证必需的配置项
+        2. 提供更详细的错误信息
+        3. 确保所有服务都正确初始化
+        """
+        try:
+            # 润色服务
+            self.polish_service = AIService(
+                model=self.session_obj.polish_model or settings.POLISH_MODEL,
+                api_key=self.session_obj.polish_api_key or settings.POLISH_API_KEY,
+                base_url=self.session_obj.polish_base_url or settings.POLISH_BASE_URL
+            )
+            
+            # 增强服务
+            self.enhance_service = AIService(
+                model=self.session_obj.enhance_model or settings.ENHANCE_MODEL,
+                api_key=self.session_obj.enhance_api_key or settings.ENHANCE_API_KEY,
+                base_url=self.session_obj.enhance_base_url or settings.ENHANCE_BASE_URL
+            )
+            
+            # 感情文章润色服务
+            self.emotion_service = AIService(
+                model=self.session_obj.emotion_model or settings.POLISH_MODEL,
+                api_key=self.session_obj.emotion_api_key or settings.POLISH_API_KEY,
+                base_url=self.session_obj.emotion_base_url or settings.POLISH_BASE_URL
+            )
+            
+            # 压缩服务
+            self.compression_service = AIService(
+                model=settings.COMPRESSION_MODEL,
+                api_key=settings.COMPRESSION_API_KEY or settings.OPENAI_API_KEY,
+                base_url=settings.COMPRESSION_BASE_URL or settings.OPENAI_BASE_URL
+            )
+            
+            print(f"[INFO] 所有 AI 服务初始化成功，会话: {self.session_obj.session_id}")
+            
+        except Exception as e:
+            error_msg = f"AI 服务初始化失败: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            raise Exception(error_msg)
     
     async def start_optimization(self):
         """开始优化流程"""
@@ -143,12 +157,29 @@ class OptimizationService:
             
         except Exception as e:
             self.session_obj.status = "failed"
-            self.session_obj.error_message = str(e)
+            # 安全地截断错误信息
+            error_msg = str(e)
+            if len(error_msg) > MAX_ERROR_MESSAGE_LENGTH:
+                error_msg = error_msg[:MAX_ERROR_MESSAGE_LENGTH - 50] + "... [错误信息已截断]"
+            self.session_obj.error_message = error_msg
             self.db.commit()
             raise
         finally:
             # 释放并发权限
             await concurrency_manager.release(self.session_obj.session_id)
+            # 清理 AI 服务资源
+            self._cleanup_ai_services()
+    
+    def _cleanup_ai_services(self):
+        """清理 AI 服务资源"""
+        try:
+            # 将服务引用设置为 None，让 Python 的垃圾回收处理
+            self.polish_service = None
+            self.enhance_service = None
+            self.emotion_service = None
+            self.compression_service = None
+        except Exception as e:
+            print(f"[WARNING] 清理 AI 服务时出错: {str(e)}", flush=True)
     
     async def _process_stage(self, stage: str):
         """处理单个阶段"""
@@ -342,10 +373,14 @@ class OptimizationService:
                 
                 segment.status = "failed"
                 self.session_obj.failed_segment_index = idx
-                # 保存错误信息（限制长度避免数据库字段溢出）
+                
+                # 安全地截断错误信息，避免数据库字段溢出
                 error_msg = str(e)
                 if len(error_msg) > MAX_ERROR_MESSAGE_LENGTH:
-                    error_msg = error_msg[:MAX_ERROR_MESSAGE_LENGTH] + "..."
+                    # 保留前面的主要错误信息和末尾的部分
+                    prefix_len = MAX_ERROR_MESSAGE_LENGTH - 50
+                    error_msg = error_msg[:prefix_len] + "... [错误信息已截断]"
+                
                 self.session_obj.error_message = error_msg
                 self.db.commit()
                 
@@ -379,17 +414,20 @@ class OptimizationService:
         
         压缩历史会话以减少token使用，但保留处理风格的关键特征。
         压缩后的内容单独保存，不影响已完成的润色和增强文本。
+        
+        如果压缩失败，返回最近的几条消息而不是抛出异常。
         """
-        # 如果历史已经是压缩格式（system消息），直接返回
-        if len(history) == 1 and history[0].get("role") == "system":
-            return history
-        
-        # 保留最近的2-3条消息作为风格参考
-        recent_messages = history[-3:] if len(history) > 3 else history
-        
-        # 选择合适的压缩提示词
-        if stage == "emotion_polish":
-            compression_prompt = """你是一个专业的文本摘要助手。请压缩以下历史处理内容，提取关键风格特征：
+        try:
+            # 如果历史已经是压缩格式（system消息），直接返回
+            if len(history) == 1 and history[0].get("role") == "system":
+                return history
+            
+            # 保留最近的2-3条消息作为风格参考
+            recent_messages = history[-3:] if len(history) > 3 else history
+            
+            # 选择合适的压缩提示词
+            if stage == "emotion_polish":
+                compression_prompt = """你是一个专业的文本摘要助手。请压缩以下历史处理内容，提取关键风格特征：
 
 1. 总结文本的表达风格和语言特点
 2. 提取关键的修改方向和处理模式
@@ -401,8 +439,8 @@ class OptimizationService:
 - 只输出压缩后的摘要，不要添加任何解释和注释
 
 历史处理内容："""
-        else:
-            compression_prompt = """你是一个专业的学术文本摘要助手。请压缩以下历史处理内容，提取关键信息：
+            else:
+                compression_prompt = """你是一个专业的学术文本摘要助手。请压缩以下历史处理内容，提取关键信息：
 
 1. 保留论文的主要术语、核心概念和关键数据
 2. 总结已处理段落的主题和要点
@@ -417,18 +455,24 @@ class OptimizationService:
 
 历史处理内容："""
 
-        compressed_summary = await self.compression_service.compress_history(
-            recent_messages, 
-            compression_prompt
-        )
-        
-        # 返回压缩后的历史作为系统消息，用于后续段落的上下文参考
-        return [
-            {
-                "role": "system",
-                "content": f"之前处理的段落摘要：\n{compressed_summary}"
-            }
-        ]
+            compressed_summary = await self.compression_service.compress_history(
+                recent_messages, 
+                compression_prompt
+            )
+            
+            # 返回压缩后的历史作为系统消息，用于后续段落的上下文参考
+            return [
+                {
+                    "role": "system",
+                    "content": f"之前处理的段落摘要：\n{compressed_summary}"
+                }
+            ]
+            
+        except Exception as e:
+            # 压缩失败时，不抛出异常，而是返回最近的几条消息
+            print(f"[WARNING] 历史压缩失败: {str(e)}, 将使用最近的消息代替", flush=True)
+            # 返回最近的2条消息，避免上下文过长
+            return history[-2:] if len(history) > 2 else history
     
     async def _save_history(self, history: List[Dict[str, str]], stage: str, char_count: int):
         """保存历史会话 - 只在压缩后保存

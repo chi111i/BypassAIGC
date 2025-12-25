@@ -5,6 +5,36 @@ from openai import AsyncOpenAI
 from app.config import settings
 
 
+def remove_thinking_tags(text: str) -> str:
+    """移除 AI 模型输出的思考标签
+    
+    某些 AI 模型（如 DeepSeek、o1）会在输出中包含思考过程标签，
+    这些标签需要被过滤掉，避免显示在前端。
+    
+    Args:
+        text: 原始文本
+        
+    Returns:
+        移除思考标签后的文本
+    """
+    if not text:
+        return text
+    
+    # 移除 <think>...</think> 和 <thinking>...</thinking> 标签及其内容
+    # 使用 DOTALL 标志使 . 匹配换行符
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<thinking>.*?</thinking>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    
+    # 移除可能残留的单独标签
+    text = re.sub(r'</?think>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</?thinking>', '', text, flags=re.IGNORECASE)
+    
+    # 清理可能产生的多余空白
+    text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
+    
+    return text.strip()
+
+
 class AIService:
     """AI 服务类"""
     
@@ -16,22 +46,43 @@ class AIService:
     ):
         self.model = model
         self.api_key = api_key or settings.OPENAI_API_KEY
-        self.base_url = (base_url or settings.OPENAI_BASE_URL).rstrip("/")
+        
+        # 修复 base_url 处理：只移除末尾的单个斜杠，保留路径部分
+        # 例如: "http://api.com/v1/" -> "http://api.com/v1"
+        raw_base_url = base_url or settings.OPENAI_BASE_URL
+        self.base_url = raw_base_url.rstrip("/") if raw_base_url else None
+        
+        # 验证必需的配置
+        if not self.api_key:
+            raise Exception("API Key 未配置，无法初始化 AI 服务")
+        if not self.base_url:
+            raise Exception("Base URL 未配置，无法初始化 AI 服务")
         
         try:
             # 初始化 OpenAI 客户端
             self.client = AsyncOpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url,
-                timeout=60.0
+                timeout=60.0,
+                max_retries=2  # 添加重试机制
             )
             
             # 启用所有API请求的日志记录
             self._enable_logging = True
             print(f"[INFO] AI Service 初始化成功: model={model}, base_url={self.base_url}")
         except Exception as e:
-            print(f"[ERROR] AI Service 初始化失败: {str(e)}")
-            raise Exception(f"AI Service 初始化失败: {str(e)}")
+            error_msg = f"AI Service 初始化失败: {str(e)}"
+            print(f"[ERROR] {error_msg}")
+            raise Exception(error_msg)
+    
+    def __del__(self):
+        """清理资源"""
+        try:
+            if hasattr(self, 'client') and self.client:
+                # AsyncOpenAI 客户端会自动清理连接
+                pass
+        except Exception:
+            pass
     
     async def stream_complete(
         self,
@@ -63,24 +114,67 @@ class AIService:
             )
 
             full_response = ""  # 收集完整响应
+            in_thinking_tag = False  # 跟踪是否在思考标签内
+            thinking_buffer = ""  # 暂存可能的思考内容
+            
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     full_response += content
-                    yield content
+                    
+                    # 检测和过滤思考标签
+                    # 将内容添加到缓冲区以检测标签
+                    thinking_buffer += content
+                    
+                    # 检查是否进入思考标签
+                    if not in_thinking_tag and ('<think>' in thinking_buffer.lower() or '<thinking>' in thinking_buffer.lower()):
+                        in_thinking_tag = True
+                        # 输出标签之前的内容
+                        before_tag = re.split(r'<think>|<thinking>', thinking_buffer, flags=re.IGNORECASE)[0]
+                        if before_tag:
+                            yield before_tag
+                        thinking_buffer = ""
+                        continue
+                    
+                    # 检查是否退出思考标签
+                    if in_thinking_tag and ('</think>' in thinking_buffer.lower() or '</thinking>' in thinking_buffer.lower()):
+                        in_thinking_tag = False
+                        # 清空缓冲区，跳过标签后的内容
+                        thinking_buffer = re.split(r'</think>|</thinking>', thinking_buffer, flags=re.IGNORECASE)[-1]
+                        continue
+                    
+                    # 如果不在思考标签内，输出内容
+                    if not in_thinking_tag:
+                        # 保留最后几个字符在缓冲区以检测跨块的标签
+                        if len(thinking_buffer) > 20:
+                            yield_content = thinking_buffer[:-20]
+                            thinking_buffer = thinking_buffer[-20:]
+                            yield yield_content
+                    else:
+                        # 在思考标签内，不输出
+                        thinking_buffer = ""
             
-            # 流式响应完成后，记录完整响应
+            # 输出剩余缓冲区内容（如果不在思考标签内）
+            if thinking_buffer and not in_thinking_tag:
+                yield thinking_buffer
+            
+            # 流式响应完成后，记录完整响应（包含思考标签）
             if self._enable_logging:
                 print("\n" + "="*80, flush=True)
-                print("[STREAM RESPONSE] Complete Response:", flush=True)
+                print("[STREAM RESPONSE] Complete Response (with thinking tags):", flush=True)
                 print(full_response, flush=True)
                 print("[STREAM RESPONSE] Total Length:", len(full_response), flush=True)
+                # 显示过滤后的长度
+                filtered = remove_thinking_tags(full_response)
+                print("[STREAM RESPONSE] Filtered Length:", len(filtered), flush=True)
                 print("="*80 + "\n", flush=True)
 
         except Exception as e:
             if self._enable_logging:
                 print(f"[STREAM ERROR] Exception: {str(e)}", flush=True)
                 print(f"[STREAM ERROR] Exception Type: {type(e).__name__}", flush=True)
+                import traceback
+                print(f"[STREAM ERROR] Traceback:\n{traceback.format_exc()}", flush=True)
             raise Exception(f"AI流式调用失败: {str(e)}")
 
     async def complete(
@@ -116,6 +210,12 @@ class AIService:
                 stream=False
             )
 
+            # 获取原始响应内容
+            raw_content = response.choices[0].message.content or ""
+            
+            # 移除思考标签
+            filtered_content = remove_thinking_tags(raw_content)
+
             # 记录响应日志
             if self._enable_logging:
                 print("\n" + "="*80, flush=True)
@@ -127,18 +227,23 @@ class AIService:
                     print(f"  Prompt Tokens: {response.usage.prompt_tokens}", flush=True)
                     print(f"  Completion Tokens: {response.usage.completion_tokens}", flush=True)
                     print(f"  Total Tokens: {response.usage.total_tokens}", flush=True)
+                print("[AI RESPONSE] Raw Content Length:", len(raw_content), flush=True)
+                print("[AI RESPONSE] Filtered Content Length:", len(filtered_content), flush=True)
+                if raw_content != filtered_content:
+                    print("[AI RESPONSE] ⚠️  Thinking tags detected and removed", flush=True)
                 print("[AI RESPONSE] Content:", flush=True)
-                print(response.choices[0].message.content, flush=True)
-                print("[AI RESPONSE] Content Length:", len(response.choices[0].message.content or ""), flush=True)
+                print(filtered_content, flush=True)
                 print("="*80 + "\n", flush=True)
 
-            return response.choices[0].message.content or ""
+            return filtered_content
 
         except Exception as e:
             if self._enable_logging:
                 print("\n" + "="*80, flush=True)
                 print("[AI ERROR] Exception:", str(e), flush=True)
                 print("[AI ERROR] Exception Type:", type(e).__name__, flush=True)
+                import traceback
+                print(f"[AI ERROR] Traceback:\n{traceback.format_exc()}", flush=True)
                 print("="*80 + "\n", flush=True)
             raise Exception(f"AI调用失败: {str(e)}")
     
