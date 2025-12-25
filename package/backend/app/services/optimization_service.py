@@ -172,14 +172,12 @@ class OptimizationService:
     
     def _cleanup_ai_services(self):
         """清理 AI 服务资源"""
-        try:
-            # 将服务引用设置为 None，让 Python 的垃圾回收处理
-            self.polish_service = None
-            self.enhance_service = None
-            self.emotion_service = None
-            self.compression_service = None
-        except Exception as e:
-            print(f"[WARNING] 清理 AI 服务时出错: {str(e)}", flush=True)
+        # 将服务引用设置为 None，让 Python 的垃圾回收处理
+        # AsyncOpenAI 客户端会自动清理连接
+        self.polish_service = None
+        self.enhance_service = None
+        self.emotion_service = None
+        self.compression_service = None
     
     async def _process_stage(self, stage: str):
         """处理单个阶段"""

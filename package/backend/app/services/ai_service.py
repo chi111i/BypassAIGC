@@ -5,6 +5,10 @@ from openai import AsyncOpenAI
 from app.config import settings
 
 
+# 流式处理中用于检测跨块标签的缓冲区大小
+THINKING_TAG_BUFFER_SIZE = 20
+
+
 def remove_thinking_tags(text: str) -> str:
     """移除 AI 模型输出的思考标签
     
@@ -75,15 +79,6 @@ class AIService:
             print(f"[ERROR] {error_msg}")
             raise Exception(error_msg)
     
-    def __del__(self):
-        """清理资源"""
-        try:
-            if hasattr(self, 'client') and self.client:
-                # AsyncOpenAI 客户端会自动清理连接
-                pass
-        except Exception:
-            pass
-    
     async def stream_complete(
         self,
         messages: List[Dict[str, str]],
@@ -146,9 +141,9 @@ class AIService:
                     # 如果不在思考标签内，输出内容
                     if not in_thinking_tag:
                         # 保留最后几个字符在缓冲区以检测跨块的标签
-                        if len(thinking_buffer) > 20:
-                            yield_content = thinking_buffer[:-20]
-                            thinking_buffer = thinking_buffer[-20:]
+                        if len(thinking_buffer) > THINKING_TAG_BUFFER_SIZE:
+                            yield_content = thinking_buffer[:-THINKING_TAG_BUFFER_SIZE]
+                            thinking_buffer = thinking_buffer[-THINKING_TAG_BUFFER_SIZE:]
                             yield yield_content
                     else:
                         # 在思考标签内，不输出
