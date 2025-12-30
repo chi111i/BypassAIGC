@@ -12,6 +12,8 @@ from typing import Dict, Tuple, Optional
 from app.config import settings
 from app.database import init_db
 from app.routes import admin, prompts, optimization
+from app.word_formatter import router as word_formatter_router
+from app.word_formatter.services import get_job_manager
 from app.models.models import CustomPrompt
 from app.database import SessionLocal
 from app.services.ai_service import get_default_polish_prompt, get_default_enhance_prompt
@@ -91,6 +93,7 @@ app.add_middleware(
 app.include_router(admin.router, prefix="/api")
 app.include_router(prompts.router, prefix="/api")
 app.include_router(optimization.router, prefix="/api")
+app.include_router(word_formatter_router, prefix="/api")
 
 # 速率限制中间件已移除
 
@@ -138,6 +141,13 @@ async def startup_event():
         db.commit()
     finally:
         db.close()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """关闭时清理资源"""
+    job_manager = get_job_manager()
+    await job_manager.shutdown()
 
 
 @app.get("/")

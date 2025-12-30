@@ -136,4 +136,60 @@ export const healthAPI = {
   }),
 };
 
+// Word Formatter API
+export const wordFormatterAPI = {
+  // Usage info (shared with polishing)
+  getUsage: () => api.get('/word-formatter/usage'),
+
+  // Specs
+  listSpecs: () => api.get('/word-formatter/specs'),
+  getSpecSchema: () => api.get('/word-formatter/specs/schema'),
+  validateSpec: (specJson) =>
+    api.post('/word-formatter/specs/validate', null, {
+      params: { spec_json: specJson },
+    }),
+  generateSpec: (requirements) =>
+    api.post('/word-formatter/specs/generate', { requirements }, {
+      timeout: 120000, // AI generation may take time
+    }),
+
+  // Format text
+  formatText: (data) =>
+    api.post('/word-formatter/format/text', data, {
+      timeout: 60000,
+    }),
+
+  // Format file
+  formatFile: (file, options = {}) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/word-formatter/format/file', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      params: options,
+      timeout: 120000,
+    });
+  },
+
+  // Jobs
+  getJobStatus: (jobId) => api.get(`/word-formatter/jobs/${jobId}`),
+  listJobs: (limit = 10) =>
+    api.get('/word-formatter/jobs', { params: { limit } }),
+  deleteJob: (jobId) => api.delete(`/word-formatter/jobs/${jobId}`),
+  getJobReport: (jobId) => api.get(`/word-formatter/jobs/${jobId}/report`),
+
+  // Download
+  getDownloadUrl: (jobId) => {
+    const cardKey = localStorage.getItem('cardKey');
+    const baseUrl = api.defaults.baseURL || '/api';
+    return `${baseUrl}/word-formatter/jobs/${jobId}/download?card_key=${cardKey}`;
+  },
+
+  // SSE stream URL
+  getStreamUrl: (jobId) => {
+    const cardKey = localStorage.getItem('cardKey');
+    const baseUrl = api.defaults.baseURL || '/api';
+    return `${baseUrl}/word-formatter/jobs/${jobId}/stream?card_key=${cardKey}`;
+  },
+};
+
 export default api;

@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_USERS: int = 5
     DEFAULT_USAGE_LIMIT: int = 1
     SEGMENT_SKIP_THRESHOLD: int = 15
+
+    # Word Formatter 文件上传限制 (MB)，0 表示无限制
+    MAX_UPLOAD_FILE_SIZE_MB: int = 0
     
     # 会话压缩配置
     HISTORY_COMPRESSION_THRESHOLD: int = 5000  # 汉字数量阈值

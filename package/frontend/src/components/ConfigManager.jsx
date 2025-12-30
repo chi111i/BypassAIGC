@@ -23,7 +23,8 @@ const ConfigManager = ({ adminToken }) => {
     COMPRESSION_API_KEY: '',
     COMPRESSION_BASE_URL: '',
     DEFAULT_USAGE_LIMIT: '',
-    SEGMENT_SKIP_THRESHOLD: ''
+    SEGMENT_SKIP_THRESHOLD: '',
+    MAX_UPLOAD_FILE_SIZE_MB: ''
   });
 
   useEffect(() => {
@@ -54,7 +55,8 @@ const ConfigManager = ({ adminToken }) => {
         COMPRESSION_API_KEY: response.data.compression?.api_key || '',
         COMPRESSION_BASE_URL: response.data.compression?.base_url || '',
         DEFAULT_USAGE_LIMIT: response.data.system.default_usage_limit?.toString() || '',
-        SEGMENT_SKIP_THRESHOLD: response.data.system.segment_skip_threshold?.toString() || ''
+        SEGMENT_SKIP_THRESHOLD: response.data.system.segment_skip_threshold?.toString() || '',
+        MAX_UPLOAD_FILE_SIZE_MB: response.data.system.max_upload_file_size_mb?.toString() || ''
       });
     } catch (error) {
       toast.error('获取配置失败');
@@ -351,6 +353,21 @@ const ConfigManager = ({ adminToken }) => {
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
             <p className="mt-1.5 text-xs text-gray-400">小于此字数的段落将被识别为标题并跳过</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-500 mb-2">
+              Word 排版文件大小限制 (MB)
+            </label>
+            <input
+              type="number"
+              value={formData.MAX_UPLOAD_FILE_SIZE_MB}
+              onChange={(e) => setFormData({...formData, MAX_UPLOAD_FILE_SIZE_MB: e.target.value})}
+              placeholder="0"
+              min="0"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+            />
+            <p className="mt-1.5 text-xs text-gray-400">0 表示无限制</p>
           </div>
         </div>
       </div>

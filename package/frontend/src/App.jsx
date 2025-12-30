@@ -5,6 +5,7 @@ import WelcomePage from './pages/WelcomePage';
 import WorkspacePage from './pages/WorkspacePage';
 import SessionDetailPage from './pages/SessionDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
+import WordFormatterPage from './pages/WordFormatterPage';
 import './index.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -67,7 +68,16 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
+
+        <Route
+          path="/word-formatter"
+          element={
+            <ProtectedRoute>
+              <WordFormatterPage />
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

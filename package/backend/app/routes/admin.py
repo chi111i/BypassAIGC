@@ -752,6 +752,7 @@ async def get_config(_: str = Depends(get_admin_from_token)) -> Dict[str, Any]:
             "default_usage_limit": settings.DEFAULT_USAGE_LIMIT,
             "segment_skip_threshold": settings.SEGMENT_SKIP_THRESHOLD,
             "use_streaming": settings.USE_STREAMING,
+            "max_upload_file_size_mb": settings.MAX_UPLOAD_FILE_SIZE_MB,
         },
     }
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   FileText, History, LogOut, Play,
-  Users, Clock, AlertCircle, CheckCircle, Trash2, Info
+  Users, Clock, AlertCircle, CheckCircle, Trash2, Info, FileType
 } from 'lucide-react';
 import { optimizationAPI } from '../api';
 
@@ -300,6 +300,16 @@ const WorkspacePage = () => {
             </div>
             
             <div className="flex items-center gap-4">
+              {/* 功能切换 */}
+              <Link
+                to="/word-formatter"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-[13px] font-medium text-gray-700 transition-colors"
+                title="Word 精确排版"
+              >
+                <FileType className="w-4 h-4" />
+                <span className="hidden sm:inline">Word 排版</span>
+              </Link>
+
               {/* 队列状态 */}
               {queueStatus && (
                 <div className="flex items-center gap-3 text-[13px]">
