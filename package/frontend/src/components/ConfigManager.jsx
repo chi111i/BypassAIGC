@@ -286,16 +286,16 @@ const ConfigManager = ({ adminToken }) => {
                 ...formData,
                 THINKING_MODE_ENABLED: !formData.THINKING_MODE_ENABLED
               })}
-              className={`relative w-14 h-8 rounded-full transition-colors ${
+              className={`relative w-12 h-7 rounded-full transition-colors ${
                 formData.THINKING_MODE_ENABLED
                   ? 'bg-indigo-600'
                   : 'bg-gray-200'
               }`}
             >
-              <span className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${
+              <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${
                 formData.THINKING_MODE_ENABLED
-                  ? 'translate-x-7'
-                  : 'translate-x-1'
+                  ? 'translate-x-5'
+                  : 'translate-x-0'
               }`} />
             </button>
           </div>
