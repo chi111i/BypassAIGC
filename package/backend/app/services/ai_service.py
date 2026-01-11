@@ -1,8 +1,72 @@
 from typing import List, Dict, Optional
 import json
 import re
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, PermissionDeniedError, AuthenticationError, RateLimitError
 from app.config import settings
+
+
+# 不可重试的错误类型 - 这些错误不应该通过降级重试来解决
+NON_RETRYABLE_ERRORS = (
+    PermissionDeniedError,  # 内容被阻止、权限不足
+    AuthenticationError,     # API Key 无效
+)
+
+# 可重试的错误类型 - 这些错误可能是临时性的，或者可以通过降级参数解决
+RETRYABLE_ERRORS = (
+    RateLimitError,  # 速率限制可能是临时的
+)
+
+
+def is_retryable_error(error: Exception) -> bool:
+    """判断错误是否可以通过降级重试来解决
+
+    Args:
+        error: 捕获的异常
+
+    Returns:
+        True 如果错误可重试，False 如果错误不可重试
+    """
+    # 不可重试的错误类型直接返回 False
+    if isinstance(error, NON_RETRYABLE_ERRORS):
+        return False
+
+    # 检查错误消息中是否包含内容被阻止的关键词
+    error_message = str(error).lower()
+    blocking_keywords = [
+        'blocked',           # 请求被阻止
+        'content filter',    # 内容过滤
+        'safety',            # 安全策略
+        'policy',            # 政策违规
+        'moderation',        # 内容审核
+        'harmful',           # 有害内容
+        'inappropriate',     # 不当内容
+    ]
+
+    for keyword in blocking_keywords:
+        if keyword in error_message:
+            return False
+
+    # 其他错误默认可重试（如不支持的参数等）
+    return True
+
+
+def get_error_category(error: Exception) -> str:
+    """获取错误分类，用于日志记录
+
+    Args:
+        error: 捕获的异常
+
+    Returns:
+        错误分类字符串
+    """
+    if isinstance(error, PermissionDeniedError):
+        return "PERMISSION_DENIED (内容可能被安全策略阻止)"
+    elif isinstance(error, AuthenticationError):
+        return "AUTHENTICATION_ERROR (API Key 无效或权限不足)"
+    elif isinstance(error, RateLimitError):
+        return "RATE_LIMIT (请求频率过高)"
+    else:
+        return f"OTHER ({type(error).__name__})"
 
 
 # 流式处理中用于检测跨块标签的缓冲区大小
@@ -129,19 +193,36 @@ class AIService:
                     print(f"  [{idx}] {role}: {content_preview}", flush=True)
                 print("="*80 + "\n", flush=True)
 
-            # 尝试调用 API，如果失败则降级重试（不带 reasoning_effort）
+            # 尝试调用 API，如果失败则根据错误类型决定是否降级重试
             try:
                 stream = await self.client.chat.completions.create(**api_params)
             except Exception as api_error:
-                # 如果使用了 reasoning_effort 且调用失败，尝试降级
-                if use_reasoning:
+                error_category = get_error_category(api_error)
+                can_retry = is_retryable_error(api_error)
+
+                if self._enable_logging:
+                    print(f"[STREAM REQUEST] API 调用失败", flush=True)
+                    print(f"[STREAM REQUEST] 错误类型: {error_category}", flush=True)
+                    print(f"[STREAM REQUEST] 错误详情: {str(api_error)}", flush=True)
+                    print(f"[STREAM REQUEST] 可否降级重试: {can_retry}", flush=True)
+
+                # 只有在使用了 reasoning_effort 且错误可重试时才降级
+                if use_reasoning and can_retry:
                     if self._enable_logging:
-                        print(f"[STREAM REQUEST] reasoning_effort 调用失败，尝试降级: {str(api_error)}", flush=True)
+                        print(f"[STREAM REQUEST] 尝试降级重试（移除 reasoning_effort）...", flush=True)
                     # 移除 extra_body（包含 reasoning_effort），添加 temperature
                     api_params.pop("extra_body", None)
                     api_params["temperature"] = temperature
                     stream = await self.client.chat.completions.create(**api_params)
                 else:
+                    # 不可重试的错误，直接抛出带有更详细信息的异常
+                    if isinstance(api_error, PermissionDeniedError):
+                        raise Exception(
+                            f"AI 请求被拒绝: {str(api_error)}。"
+                            f"这可能是因为: 1) 内容触发了 AI 服务商的安全过滤; "
+                            f"2) API Key 权限不足; 3) 代理服务配置问题。"
+                            f"建议检查输入内容或联系 API 服务商。"
+                        )
                     raise
 
             full_response = ""  # 收集完整响应
@@ -262,19 +343,36 @@ class AIService:
                     print(f"  Content: {content_preview}", flush=True)
                 print("="*80 + "\n", flush=True)
 
-            # 尝试调用 API，如果失败则降级重试（不带 reasoning_effort）
+            # 尝试调用 API，如果失败则根据错误类型决定是否降级重试
             try:
                 response = await self.client.chat.completions.create(**api_params)
             except Exception as api_error:
-                # 如果使用了 reasoning_effort 且调用失败，尝试降级
-                if use_reasoning:
+                error_category = get_error_category(api_error)
+                can_retry = is_retryable_error(api_error)
+
+                if self._enable_logging:
+                    print(f"[AI REQUEST] API 调用失败", flush=True)
+                    print(f"[AI REQUEST] 错误类型: {error_category}", flush=True)
+                    print(f"[AI REQUEST] 错误详情: {str(api_error)}", flush=True)
+                    print(f"[AI REQUEST] 可否降级重试: {can_retry}", flush=True)
+
+                # 只有在使用了 reasoning_effort 且错误可重试时才降级
+                if use_reasoning and can_retry:
                     if self._enable_logging:
-                        print(f"[AI REQUEST] reasoning_effort 调用失败，尝试降级: {str(api_error)}", flush=True)
+                        print(f"[AI REQUEST] 尝试降级重试（移除 reasoning_effort）...", flush=True)
                     # 移除 extra_body（包含 reasoning_effort），添加 temperature
                     api_params.pop("extra_body", None)
                     api_params["temperature"] = temperature
                     response = await self.client.chat.completions.create(**api_params)
                 else:
+                    # 不可重试的错误，直接抛出带有更详细信息的异常
+                    if isinstance(api_error, PermissionDeniedError):
+                        raise Exception(
+                            f"AI 请求被拒绝: {str(api_error)}。"
+                            f"这可能是因为: 1) 内容触发了 AI 服务商的安全过滤; "
+                            f"2) API Key 权限不足; 3) 代理服务配置问题。"
+                            f"建议检查输入内容或联系 API 服务商。"
+                        )
                     raise
 
             # 获取原始响应内容
