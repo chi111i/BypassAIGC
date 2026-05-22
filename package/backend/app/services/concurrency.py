@@ -12,47 +12,57 @@ class ConcurrencyManager:
     
     def __init__(self, max_concurrent: int = None):
         self.max_concurrent = max_concurrent or settings.MAX_CONCURRENT_USERS
+        self.max_per_user = settings.MAX_CONCURRENT_PER_USER
         self.active_sessions: Dict[str, datetime] = {}
+        self.active_per_user: Dict[int, int] = {}
+        self._session_user: Dict[str, int] = {}  # session_id -> user_id
         self.queue: List[str] = []
         self._lock = asyncio.Lock()
-        self._condition = asyncio.Condition(self._lock)  # 添加条件变量
+        self._condition = asyncio.Condition(self._lock)
     
-    async def acquire(self, session_id: str, timeout: float = ACQUIRE_TIMEOUT) -> bool:
+    async def acquire(self, session_id: str, user_id: int = None, timeout: float = ACQUIRE_TIMEOUT) -> bool:
         """获取执行权限
         
         Args:
             session_id: 会话ID
+            user_id: 用户ID（用于每用户并发控制）
             timeout: 等待超时时间（秒），默认1小时
             
         Returns:
             True if acquired, False if timed out or removed from queue
         """
         async with self._condition:
-            # 如果已经在活跃会话中,直接返回
             if session_id in self.active_sessions:
                 return True
             
-            if len(self.active_sessions) < self.max_concurrent:
+            user_count = self.active_per_user.get(user_id, 0) if user_id is not None else 0
+            can_acquire = (
+                len(self.active_sessions) < self.max_concurrent
+                and (user_id is None or user_count < self.max_per_user)
+            )
+            
+            if can_acquire:
                 self.active_sessions[session_id] = datetime.utcnow()
+                if user_id is not None:
+                    self.active_per_user[user_id] = self.active_per_user.get(user_id, 0) + 1
+                    self._session_user[session_id] = user_id
                 return True
 
             if session_id not in self.queue:
                 self.queue.append(session_id)
+                if user_id is not None:
+                    self._session_user[session_id] = user_id
             
-            # 等待被唤醒，设置超时防止无限等待
             start_time = datetime.utcnow()
             while session_id not in self.active_sessions and session_id in self.queue:
                 try:
-                    # 使用 wait_for 设置超时
                     remaining_timeout = timeout - (datetime.utcnow() - start_time).total_seconds()
                     if remaining_timeout <= 0:
-                        # 超时，从队列中移除
                         if session_id in self.queue:
                             self.queue.remove(session_id)
                         return False
                     await asyncio.wait_for(self._condition.wait(), timeout=min(remaining_timeout, 60))
                 except asyncio.TimeoutError:
-                    # 每60秒检查一次是否超时
                     continue
             
             return session_id in self.active_sessions
@@ -60,12 +70,21 @@ class ConcurrencyManager:
     async def release(self, session_id: str):
         """释放执行权限"""
         async with self._condition:
-            if session_id in self.active_sessions:
+            was_active = session_id in self.active_sessions
+            user_id = self._session_user.pop(session_id, None)
+            if user_id is not None and was_active:
+                count = self.active_per_user.get(user_id, 0) - 1
+                if count <= 0:
+                    self.active_per_user.pop(user_id, None)
+                else:
+                    self.active_per_user[user_id] = count
+            if was_active:
                 del self.active_sessions[session_id]
             if session_id in self.queue:
                 self.queue.remove(session_id)
-            self._activate_waiting_locked()
-            self._condition.notify_all()  # 唤醒所有等待者
+            if was_active:
+                self._activate_waiting_locked()
+                self._condition.notify_all()
     
     async def get_status(self, session_id: Optional[str] = None) -> Dict:
         """获取队列状态"""
@@ -104,11 +123,30 @@ class ConcurrencyManager:
             self._activate_waiting_locked()
             self._condition.notify_all()  # 唤醒所有等待者以检查新的限制
 
+    async def update_per_user_limit(self, new_limit: int):
+        """更新每用户并发限制"""
+        async with self._condition:
+            self.max_per_user = max(1, new_limit)
+            # 检查当前活跃用户是否超过新限制
+            for user_id in list(self.active_per_user.keys()):
+                if self.active_per_user[user_id] > self.max_per_user:
+                    # 用户超过限制，保留 max_per_user 个，多余的标记为可释放
+                    pass  # 等待队列中的后续 session 会被 _activate_waiting_locked 的 per_user 检查挡住
+            self._activate_waiting_locked()
+            self._condition.notify_all()
+
     def _activate_waiting_locked(self):
         """尝试为等待队列中的会话分配执行权限 (需持有锁)"""
         while self.queue and len(self.active_sessions) < self.max_concurrent:
-            next_session = self.queue.pop(0)
+            next_session = self.queue[0]
+            user_id = self._session_user.get(next_session)
+            if user_id is not None and self.active_per_user.get(user_id, 0) >= self.max_per_user:
+                break  # 此用户已达上限，跳过
+            self.queue.pop(0)
             self.active_sessions[next_session] = datetime.utcnow()
+            if user_id is not None:
+                self._session_user[next_session] = user_id
+                self.active_per_user[user_id] = self.active_per_user.get(user_id, 0) + 1
 
 
 # 全局并发管理器实例

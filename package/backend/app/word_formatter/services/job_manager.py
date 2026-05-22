@@ -93,6 +93,7 @@ class JobManager:
     ):
         self._jobs: Dict[str, Job] = {}
         self._job_locks: Dict[str, asyncio.Lock] = {}
+        self._running_tasks: Dict[str, asyncio.Task] = {}  # 跟踪运行中的任务，用于取消
         self._semaphore = asyncio.Semaphore(max_concurrent_jobs)
         self._job_retention = timedelta(hours=job_retention_hours)
         self._cleanup_task: Optional[asyncio.Task] = None
@@ -169,6 +170,10 @@ class JobManager:
         print(f"[WORD-FORMATTER] Job ID: {job_id[:8]}... 类型: {job.job_type.value}", flush=True)
 
         async with self._semaphore:
+            # 注册当前 task，用于 delete_job 时取消
+            current_task = asyncio.current_task()
+            self._running_tasks[job_id] = current_task
+
             async with self._job_locks[job_id]:
                 job.status = JobStatus.RUNNING
                 job.updated_at = datetime.now()
@@ -181,6 +186,15 @@ class JobManager:
                     else:
                         raise ValueError(f"Unknown job type: {job.job_type}")
 
+                except asyncio.CancelledError:
+                    # 任务被取消，释放 semaphore 槽位
+                    job.status = JobStatus.CANCELLED
+                    job.updated_at = datetime.now()
+                    job.error = "任务被用户取消"
+                    print(f"[WORD-FORMATTER] ⚠️ 任务被取消 job_id={job_id[:8]}...", flush=True)
+                    # 重新抛出 CancelledError，让 asyncio 处理
+                    raise
+
                 except Exception as e:
                     import traceback
                     job.status = JobStatus.FAILED
@@ -189,6 +203,10 @@ class JobManager:
                     print(f"[WORD-FORMATTER] 异常类型: {type(e).__name__}", flush=True)
                     print(f"[WORD-FORMATTER] 异常信息: {e}", flush=True)
                     print(f"[WORD-FORMATTER] 堆栈跟踪:\n{traceback.format_exc()}", flush=True)
+
+                finally:
+                    # 确保清理运行任务记录
+                    self._running_tasks.pop(job_id, None)
 
                 job.updated_at = datetime.now()
                 print(f"[WORD-FORMATTER] ========== 任务执行结束 ==========\n", flush=True)
@@ -281,6 +299,10 @@ class JobManager:
             return False
 
         if job.status in {JobStatus.PENDING, JobStatus.RUNNING}:
+            # 取消正在运行的任务，释放 semaphore 槽位
+            task = self._running_tasks.get(job_id)
+            if task and not task.done():
+                task.cancel()
             job.status = JobStatus.CANCELLED
             job.updated_at = datetime.now()
             return True
@@ -288,11 +310,19 @@ class JobManager:
         return False
 
     def delete_job(self, job_id: str) -> bool:
-        """Delete a job and its data."""
+        """Delete a job and its data. For RUNNING jobs, also cancels the asyncio task to release semaphore."""
         if job_id in self._jobs:
+            job = self._jobs[job_id]
+            if job.status in {JobStatus.RUNNING, JobStatus.CANCELLED}:
+                # 取消正在运行的任务，释放 semaphore 槽位
+                task = self._running_tasks.get(job_id)
+                if task and not task.done():
+                    task.cancel()
+                    print(f"[WORD-FORMATTER] 🛑 取消运行中的任务 job_id={job_id[:8]}...", flush=True)
             del self._jobs[job_id]
             if job_id in self._job_locks:
                 del self._job_locks[job_id]
+            self._running_tasks.pop(job_id, None)
             return True
         return False
 
@@ -411,14 +441,19 @@ class JobManager:
         # 停止清理循环
         self.stop_cleanup_loop()
 
-        # 取消所有运行中的任务
-        for job_id, job in list(self._jobs.items()):
-            if job.status == JobStatus.RUNNING:
-                job.status = JobStatus.CANCELLED
-                job.error = "服务关闭，任务被取消"
+        # 取消所有运行中的任务，释放 semaphore 槽位
+        for job_id, task in list(self._running_tasks.items()):
+            if not task.done():
+                task.cancel()
+                print(f"[WORD-FORMATTER] 🛑 关闭时取消任务 job_id={job_id[:8]}...", flush=True)
+
+        # 等待任务取消完成（可选，防止立即清理）
+        if self._running_tasks:
+            await asyncio.sleep(0.1)  # 给取消的任务一点时间处理 CancelledError
 
         # 清空任务字典
         self._jobs.clear()
+        self._running_tasks.clear()
 
     def get_stats(self) -> Dict[str, int]:
         """Get job statistics."""

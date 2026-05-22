@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import List, Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.models import User, SavedSpec
 from app.services.ai_service import AIService
+from app.utils.auth import get_user_from_token
 
 from .services import (
     CompileOptions,
@@ -235,30 +236,52 @@ class SavedSpecListResponse(BaseModel):
     specs: List[SavedSpecResponse]
 
 
-def get_current_user(card_key: str, db: Session = Depends(get_db)) -> User:
-    """Get current user by card_key."""
-    user = db.query(User).filter(
-        User.card_key == card_key,
-        User.is_active == True
-    ).first()
+def get_current_user(
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+) -> User:
+    """Get current user by JWT token or card_key (backward compat)."""
+    if authorization and authorization.startswith("Bearer "):
+        jwt_token = authorization.split(" ")[1]
+        user_id = get_user_from_token(jwt_token)
+        if user_id is not None:
+            user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+            if user:
+                user.last_used = datetime.utcnow()
+                db.commit()
+                return user
 
-    if not user:
-        raise HTTPException(status_code=401, detail="无效的卡密")
+    if token:
+        user_id = get_user_from_token(token)
+        if user_id is not None:
+            user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+            if user:
+                user.last_used = datetime.utcnow()
+                db.commit()
+                return user
 
-    user.last_used = datetime.utcnow()
-    db.commit()
+    if card_key:
+        user = db.query(User).filter(
+            User.card_key == card_key,
+            User.is_active.is_(True),
+        ).first()
+        if user:
+            user.last_used = datetime.utcnow()
+            db.commit()
+            return user
 
-    return user
+    raise HTTPException(status_code=401, detail="未提供有效认证")
 
 
 def check_usage_limit(user: User) -> None:
     """Check if user has remaining usage quota (shared with polishing)."""
-    usage_limit = user.usage_limit if user.usage_limit is not None else settings.DEFAULT_USAGE_LIMIT
+    usage_limit = user.usage_limit or 0
     usage_count = user.usage_count or 0
 
-    # 0 means unlimited
     if usage_limit > 0 and usage_count >= usage_limit:
-        raise HTTPException(status_code=403, detail="该卡密已达到使用次数限制")
+        raise HTTPException(status_code=403, detail="该账户已达到使用次数限制")
 
 
 def increment_usage(user: User, db: Session) -> None:
@@ -278,11 +301,12 @@ def get_ai_service() -> AIService:
 
 @router.get("/usage", response_model=UsageInfoResponse)
 async def get_usage_info(
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Get user's usage information (shared with polishing)."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     usage_limit = user.usage_limit if user.usage_limit is not None else settings.DEFAULT_USAGE_LIMIT
     usage_count = user.usage_count or 0
@@ -319,12 +343,13 @@ async def validate_spec(spec_json: str):
 
 @router.post("/specs/generate")
 async def generate_spec(
-    card_key: str,
     request: GenerateSpecRequest,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Generate a formatting spec from user requirements using AI."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
     check_usage_limit(user)
 
     print(f"\n[WORD-FORMATTER] ========== AI 规范生成请求 ==========", flush=True)
@@ -353,13 +378,14 @@ async def generate_spec(
 
 @router.post("/format/text", response_model=JobResponse)
 async def format_text(
-    card_key: str,
     request: FormatRequest,
     background_tasks: BackgroundTasks,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Format text document and return job ID."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
     check_usage_limit(user)
 
     if not request.text:
@@ -420,7 +446,8 @@ async def format_text(
 
 @router.post("/format/file", response_model=JobResponse)
 async def format_file(
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     file: UploadFile = File(...),
     input_format: str = Query("auto"),
     spec_name: Optional[str] = Query(None),
@@ -431,7 +458,7 @@ async def format_file(
     db: Session = Depends(get_db)
 ):
     """Upload and format a document file (docx, txt, md)."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
     check_usage_limit(user)
 
     if not file.filename:
@@ -529,11 +556,12 @@ async def format_file(
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(
     job_id: str,
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Get job status and progress."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     job_manager = get_job_manager()
     job = job_manager.get_job(job_id)
@@ -560,11 +588,13 @@ async def get_job_status(
 async def stream_job_progress(
     job_id: str,
     request: Request,
-    card_key: str,
+    card_key: str = Query(None),
+    token: str = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Stream job progress via SSE."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(authorization=authorization, card_key=card_key, db=db)
 
     job_manager = get_job_manager()
     job = job_manager.get_job(job_id)
@@ -590,11 +620,13 @@ async def stream_job_progress(
 @router.get("/jobs/{job_id}/download")
 async def download_result(
     job_id: str,
-    card_key: str,
+    card_key: str = Query(None),
+    token: str = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Download the formatted document."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(authorization=authorization, card_key=card_key, db=db)
 
     job_manager = get_job_manager()
     job = job_manager.get_job(job_id)
@@ -637,11 +669,12 @@ async def download_result(
 @router.get("/jobs/{job_id}/report")
 async def get_validation_report(
     job_id: str,
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Get the validation report for a completed job."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     job_manager = get_job_manager()
     job = job_manager.get_job(job_id)
@@ -683,11 +716,12 @@ async def get_validation_report(
 @router.delete("/jobs/{job_id}")
 async def delete_job(
     job_id: str,
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Delete a job and its data."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     job_manager = get_job_manager()
     job = job_manager.get_job(job_id)
@@ -705,12 +739,13 @@ async def delete_job(
 
 @router.get("/jobs")
 async def list_jobs(
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """List user's recent jobs."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     job_manager = get_job_manager()
     jobs = job_manager.get_user_jobs(str(user.id), limit)
@@ -735,13 +770,14 @@ async def list_jobs(
 
 @router.post("/preprocess/text", response_model=PreprocessJobResponse)
 async def preprocess_text(
-    card_key: str,
     request: PreprocessRequest,
     background_tasks: BackgroundTasks,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Start text preprocessing job."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
     check_usage_limit(user)
 
     print(f"\n[WORD-FORMATTER] ========== 文本预处理请求 ==========", flush=True)
@@ -779,7 +815,8 @@ async def preprocess_text(
 
 @router.post("/preprocess/file", response_model=PreprocessJobResponse)
 async def preprocess_file(
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     file: UploadFile = File(...),
     chunk_paragraphs: int = Query(40, ge=10, le=100),
     chunk_chars: int = Query(8000, ge=2000, le=15000),
@@ -787,7 +824,7 @@ async def preprocess_file(
     db: Session = Depends(get_db)
 ):
     """Upload and preprocess a document file."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
     check_usage_limit(user)
 
     if not file.filename:
@@ -864,11 +901,13 @@ async def preprocess_file(
 async def stream_preprocess_progress(
     job_id: str,
     request: Request,
-    card_key: str,
+    card_key: str = Query(None),
+    token: str = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Stream preprocessing progress via SSE."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(authorization=authorization, card_key=card_key, db=db)
 
     job_manager = get_job_manager()
     job = job_manager.get_job(job_id)
@@ -897,11 +936,12 @@ async def stream_preprocess_progress(
 @router.get("/preprocess/{job_id}/result", response_model=PreprocessResultResponse)
 async def get_preprocess_result(
     job_id: str,
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Get preprocessing result."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     job_manager = get_job_manager()
     job = job_manager.get_job(job_id)
@@ -951,11 +991,12 @@ async def get_preprocess_result(
 @router.delete("/preprocess/{job_id}")
 async def delete_preprocess_job(
     job_id: str,
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Delete a preprocess job."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     job_manager = get_job_manager()
     job = job_manager.get_job(job_id)
@@ -978,12 +1019,13 @@ async def delete_preprocess_job(
 
 @router.post("/specs/save", response_model=SavedSpecResponse)
 async def save_spec(
-    card_key: str,
     request: SaveSpecRequest,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Save a user's custom spec."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     # Validate spec JSON
     try:
@@ -1040,11 +1082,12 @@ async def save_spec(
 
 @router.get("/specs/saved", response_model=SavedSpecListResponse)
 async def list_saved_specs(
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """List user's saved specs."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     specs = db.query(SavedSpec).filter(
         SavedSpec.user_id == user.id
@@ -1068,11 +1111,12 @@ async def list_saved_specs(
 @router.get("/specs/saved/{spec_id}", response_model=SavedSpecResponse)
 async def get_saved_spec(
     spec_id: int,
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Get a specific saved spec."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     spec = db.query(SavedSpec).filter(
         SavedSpec.id == spec_id,
@@ -1095,11 +1139,12 @@ async def get_saved_spec(
 @router.delete("/specs/saved/{spec_id}")
 async def delete_saved_spec(
     spec_id: int,
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """Delete a saved spec."""
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     spec = db.query(SavedSpec).filter(
         SavedSpec.id == spec_id,
@@ -1127,8 +1172,9 @@ async def get_paragraph_types():
 
 @router.post("/format-check/text", response_model=FormatCheckResponse)
 async def format_check_text(
-    card_key: str,
     request: FormatCheckRequest,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -1137,7 +1183,7 @@ async def format_check_text(
     This endpoint detects Markdown format issues and auto-identifies paragraph types
     based on rules. Users can choose between 'loose' and 'strict' check modes.
     """
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     print(f"\n[WORD-FORMATTER] ========== 文章格式检测请求 ==========", flush=True)
     print(f"[WORD-FORMATTER] 用户ID: {user.id}", flush=True)
@@ -1196,7 +1242,8 @@ async def format_check_text(
 
 @router.post("/format-check/file", response_model=FormatCheckResponse)
 async def format_check_file(
-    card_key: str,
+    card_key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
     file: UploadFile = File(...),
     mode: str = Query("loose", description="检测模式: loose(宽松) 或 strict(严格)"),
     db: Session = Depends(get_db)
@@ -1206,7 +1253,7 @@ async def format_check_file(
 
     Supports .docx, .txt, .md files.
     """
-    user = get_current_user(card_key, db)
+    user = get_current_user(card_key=card_key, authorization=authorization, db=db)
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名不能为空")

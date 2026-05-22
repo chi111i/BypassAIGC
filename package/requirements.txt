@@ -1,33 +1,34 @@
 # AI 学术写作助手 - 打包依赖
-# 包含后端所有依赖 + PyInstaller
+# Python 3.9+ 可运行，构建 exe 推荐 3.12+（pydantic 等包的 wheel 覆盖更全）
+# 3.14 也可用，pip 会自动拉取兼容版本
 
 # FastAPI 后端依赖
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-sqlalchemy==2.0.25
-pydantic==2.5.3
-pydantic-settings==2.1.0
-python-multipart==0.0.6
-python-dotenv==1.0.0
-openai==1.10.0
-httpx[socks]==0.27.0
-aiofiles==23.2.1
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-alembic==1.13.1
-redis==5.0.1
-aioredis==2.0.1
-sse-starlette==3.0.3
+fastapi>=0.109.0,<1.0
+uvicorn[standard]>=0.27.0,<1.0
+sqlalchemy>=2.0.25,<3.0
+pydantic>=2.5.3,<3.0
+pydantic-settings>=2.1.0,<3.0
+python-multipart>=0.0.6,<1.0
+python-dotenv>=1.0.0,<2.0
+openai>=1.10.0,<2.0
+httpx[socks]>=0.27.0,<1.0
+aiofiles>=23.2.0,<24.0
+python-jose[cryptography]>=3.3.0,<4.0
+bcrypt>=4.1,<5.0
+alembic>=1.13.0,<2.0
+redis>=5.0.0,<6.0
+sse-starlette>=3.0.0,<4.0
 
 # Word 格式化模块依赖
 mistune>=3.0.0
 python-docx>=1.1.0
 lxml>=4.9.0
 
-# 打包工具
-pyinstaller==6.3.0
+# 打包工具（Python 3.12+ 需要 >=6.5）
+pyinstaller>=6.5
 
 # PyInstaller 打包 Linux 需要显式包含 (pkg_resources 依赖)
 jaraco.text
 jaraco.functools
 jaraco.context
+platformdirs

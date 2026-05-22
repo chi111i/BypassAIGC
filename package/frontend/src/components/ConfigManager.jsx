@@ -19,11 +19,11 @@ const ConfigManager = ({ adminToken }) => {
     EMOTION_API_KEY: '',
     EMOTION_BASE_URL: '',
     MAX_CONCURRENT_USERS: '',
+    MAX_CONCURRENT_PER_USER: '',
     HISTORY_COMPRESSION_THRESHOLD: '',
     COMPRESSION_MODEL: '',
     COMPRESSION_API_KEY: '',
     COMPRESSION_BASE_URL: '',
-    DEFAULT_USAGE_LIMIT: '',
     SEGMENT_SKIP_THRESHOLD: '',
     MAX_UPLOAD_FILE_SIZE_MB: '',
     API_REQUEST_INTERVAL: '',
@@ -54,11 +54,11 @@ const ConfigManager = ({ adminToken }) => {
         EMOTION_API_KEY: response.data.emotion?.api_key || '',
         EMOTION_BASE_URL: response.data.emotion?.base_url || '',
         MAX_CONCURRENT_USERS: response.data.system.max_concurrent_users?.toString() || '',
+        MAX_CONCURRENT_PER_USER: response.data.system.max_concurrent_per_user?.toString() || '3',
         HISTORY_COMPRESSION_THRESHOLD: response.data.system.history_compression_threshold?.toString() || '',
         COMPRESSION_MODEL: response.data.compression?.model || '',
         COMPRESSION_API_KEY: response.data.compression?.api_key || '',
         COMPRESSION_BASE_URL: response.data.compression?.base_url || '',
-        DEFAULT_USAGE_LIMIT: response.data.system.default_usage_limit?.toString() || '',
         SEGMENT_SKIP_THRESHOLD: response.data.system.segment_skip_threshold?.toString() || '',
         MAX_UPLOAD_FILE_SIZE_MB: response.data.system.max_upload_file_size_mb?.toString() || '',
         API_REQUEST_INTERVAL: response.data.system.api_request_interval?.toString() || '6',
@@ -445,16 +445,16 @@ const ConfigManager = ({ adminToken }) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-2">
-              默认使用次数限制
+              每用户最大并发数
             </label>
             <input
               type="number"
-              value={formData.DEFAULT_USAGE_LIMIT}
-              onChange={(e) => setFormData({...formData, DEFAULT_USAGE_LIMIT: e.target.value})}
-              placeholder="1"
+              value={formData.MAX_CONCURRENT_PER_USER}
+              onChange={(e) => setFormData({...formData, MAX_CONCURRENT_PER_USER: e.target.value})}
+              placeholder="3"
               className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
             />
-            <p className="mt-1.5 text-xs text-gray-400">新用户的默认使用次数限制，0 表示无限制</p>
+            <p className="mt-1.5 text-xs text-gray-400">同一用户同时运行的最大任务数</p>
           </div>
 
           <div>

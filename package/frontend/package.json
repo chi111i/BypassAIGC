@@ -1,6 +1,6 @@
 {
   "name": "ai-polish-frontend",
-  "version": "1.0.0",
+  "version": "2.6.5",
   "private": true,
   "scripts": {
     "dev": "vite",

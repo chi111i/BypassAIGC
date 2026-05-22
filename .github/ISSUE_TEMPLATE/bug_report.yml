@@ -1,0 +1,97 @@
+name: "缺陷报告 / Bug Report"
+description: "提交 Bug 帮助我们改进产品"
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🐛 提交前请检查
+
+        - ✅ 我已搜索过已有 Issue，确认没有重复
+        - ✅ 我已尝试阅读文档或 FAQ，确认不是操作问题
+        - ✅ 我已尽量提供完整的信息帮助定位问题
+
+        ---
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "问题描述"
+      description: "请用一两句话清晰描述你遇到的问题（什么功能、发生了什么异常）"
+      placeholder: "例如：点击「生成论文」按钮后，页面一直显示加载中，没有任何响应"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "复现步骤"
+      description: "请按 1. 2. 3. 的格式，一步一步描述如何复现该问题"
+      placeholder: |
+        1. 打开程序，进入「论文生成」页面
+        2. 输入论文标题为「XXX」
+        3. 点击「生成」按钮
+        4. 页面卡住，Console 报错：XXXX
+      value: "1.\n2.\n3."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "预期结果"
+      description: "你认为正常情况下应该发生什么？"
+      placeholder: "应正常生成论文并显示结果页面"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "实际结果"
+      description: "实际上发生了什么？"
+      placeholder: "按钮点击后无响应，页面白屏"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "日志 / 截图"
+      description: "如果有程序日志、浏览器 Console 报错或截图，请贴在这里（非常重要）"
+      placeholder: "拖拽图片到此处上传，或粘贴日志文本。日志文件通常位于 exe 同目录下的 logs/ 文件夹中"
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: "程序版本"
+      description: "exe 文件名中或程序界面上的版本号"
+      placeholder: "例如：v1.0.0 或 构建日期 2026-05-19"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: "操作系统"
+      description: "你正在使用的操作系统"
+      options:
+        - Windows 10
+        - Windows 11
+        - Windows 其他
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "其他补充"
+      description: "任何可能有帮助的额外信息（是否使用了代理、网络环境、特殊配置等）"
+      placeholder: "无"
+    validations:
+      required: false

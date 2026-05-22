@@ -12,9 +12,9 @@ import FormatCheckerPage from './pages/FormatCheckerPage';
 import './index.css';
 
 const ProtectedRoute = ({ children }) => {
-  const cardKey = localStorage.getItem('cardKey');
+  const token = sessionStorage.getItem('authToken');
   
-  if (!cardKey) {
+  if (!token) {
     return <Navigate to="/" replace />;
   }
   
@@ -51,7 +51,6 @@ function App() {
       
       <Routes>
         <Route path="/" element={<WelcomePage />} />
-        <Route path="/access/:cardKey" element={<WelcomePage />} />
         <Route path="/admin" element={<AdminDashboard />} />
         
         <Route

@@ -123,12 +123,11 @@ const WorkspacePage = () => {
       const response = await optimizationAPI.listSessions();
       setSessions(response.data);
 
-      // 查找正在处理的会话
-      const processing = response.data.find(
+      const active = response.data.filter(
         s => s.status === 'processing' || s.status === 'queued'
       );
-      if (processing) {
-        setActiveSession(processing.session_id);
+      if (active.length > 0) {
+        setActiveSession(active[0].session_id);
       }
     } catch (error) {
       console.error('加载会话失败:', error);
@@ -147,59 +146,58 @@ const WorkspacePage = () => {
     }
   }, []);
 
-  const updateSessionProgress = useCallback(async (sessionId) => {
-    try {
-      const response = await optimizationAPI.getSessionProgress(sessionId);
-      const progress = response.data;
+  const pollAllActiveSessions = useCallback(async () => {
+    const active = sessions.filter(
+      s => s.status === 'processing' || s.status === 'queued'
+    );
+    if (active.length === 0) return;
 
-      // 更新会话列表中的进度 - 只在数据有变化时更新
-      setSessions(prev => {
-        const target = prev.find(s => s.session_id === sessionId);
-        if (target && target.progress === progress.progress && target.status === progress.status) {
-          return prev; // 无变化，不触发重渲染
+    const results = await Promise.allSettled(
+      active.map(s => optimizationAPI.getSessionProgress(s.session_id))
+    );
+
+    let anyCompleted = false;
+    setSessions(prev => {
+      let updated = [...prev];
+      results.forEach((result, i) => {
+        if (result.status !== 'fulfilled') return;
+        const progress = result.value.data;
+        const sid = active[i].session_id;
+        const idx = updated.findIndex(s => s.session_id === sid);
+        if (idx < 0) return;
+        const target = updated[idx];
+        if (target.progress === progress.progress && target.status === progress.status) return;
+        updated[idx] = { ...updated[idx], ...progress };
+        if (progress.status === 'completed' || progress.status === 'failed') {
+          anyCompleted = true;
         }
-        return prev.map(s =>
-          s.session_id === sessionId ? { ...s, ...progress } : s
-        );
       });
+      return [...updated];
+    });
 
-      // 如果会话完成,刷新列表
-      if (progress.status === 'completed' || progress.status === 'failed') {
-        setActiveSession(null);
-        loadSessions();
-
-        if (progress.status === 'completed') {
-          toast.success('优化完成!');
-        } else {
-          toast.error(`优化失败: ${progress.error_message}`);
-        }
-      }
-    } catch (error) {
-      console.error('更新进度失败:', error);
+    if (anyCompleted) {
+      loadSessions();
     }
-  }, [loadSessions]);
+  }, [sessions, loadSessions]);
 
-  // 初始加载 - 只在组件挂载时执行一次
   useEffect(() => {
     loadSessions();
     loadQueueStatus();
   }, [loadSessions, loadQueueStatus]);
 
-  // 队列状态轮询 - 独立的 useEffect，避免与初始加载混淆
   useEffect(() => {
     const interval = setInterval(loadQueueStatus, 15000);
     return () => clearInterval(interval);
   }, [loadQueueStatus]);
 
   useEffect(() => {
-    // 如果有活跃会话,每4秒更新进度（进一步降低频率）
-    if (activeSession) {
-      const interval = setInterval(() => {
-        updateSessionProgress(activeSession);
-      }, 4000);
-      return () => clearInterval(interval);
-    }
-  }, [activeSession, updateSessionProgress]);
+    const active = sessions.filter(
+      s => s.status === 'processing' || s.status === 'queued'
+    );
+    if (active.length === 0) return;
+    const interval = setInterval(pollAllActiveSessions, 4000);
+    return () => clearInterval(interval);
+  }, [pollAllActiveSessions, sessions]);
 
   const handleStartOptimization = useCallback(async () => {
     if (!text.trim()) {
@@ -230,7 +228,8 @@ const WorkspacePage = () => {
   }, [text, processingMode, isSubmitting, loadSessions]);
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('cardKey');
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('username');
     navigate('/');
   }, [navigate]);
 
@@ -277,12 +276,6 @@ const WorkspacePage = () => {
       toast.error(error.response?.data?.detail || '重试失败，请稍后再试');
     }
   }, [loadSessions]);
-
-  // 使用 useMemo 缓存当前活跃会话的数据
-  const currentActiveSessionData = useMemo(() => {
-    return sessions.find(s => s.session_id === activeSession);
-  }, [sessions, activeSession]);
-
 
   return (
     <div className="min-h-screen bg-ios-background">
@@ -415,7 +408,7 @@ const WorkspacePage = () => {
               <div className="mt-5 flex justify-end">
                 <button
                   onClick={handleStartOptimization}
-                  disabled={!text.trim() || activeSession || isSubmitting}
+                  disabled={!text.trim() || isSubmitting}
                   className="flex items-center gap-2 bg-ios-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-8 rounded-xl transition-all active:scale-[0.98] shadow-sm text-[17px]"
                 >
                   {isSubmitting ? (
@@ -434,65 +427,49 @@ const WorkspacePage = () => {
             </div>
 
             {/* 活跃会话进度 */}
-            {activeSession && currentActiveSessionData && (
-              <div className="bg-white rounded-2xl shadow-ios p-5 border border-blue-100">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-[17px] font-bold text-black flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-ios-blue animate-pulse" />
-                    正在处理
-                  </h2>
-                  <span className="text-[13px] font-medium px-2 py-1 bg-blue-50 text-ios-blue rounded-md">
-                    进行中
-                  </span>
-                </div>
+            {(() => {
+              const activeSessions = sessions.filter(
+                s => s.status === 'processing' || s.status === 'queued'
+              );
+              if (activeSessions.length === 0) return null;
 
-                {(() => {
-                  const session = currentActiveSessionData;
-                  const getStageName = (stage) => {
-                    if (stage === 'polish') return '论文润色';
-                    if (stage === 'emotion_polish') return '感情文章润色';
-                    if (stage === 'enhance') return '原创性增强';
-                    return stage;
-                  };
-                  return (
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between text-[13px] mb-2 font-medium">
-                          <span className="text-ios-gray">
-                            当前阶段: <span className="text-black">{getStageName(session.current_stage)}</span>
-                          </span>
-                          <span className="text-ios-blue">
-                            {session.progress.toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-2">
-                          <div
-                            className="bg-ios-blue h-2 rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(0,122,255,0.3)]"
-                            style={{ width: `${session.progress}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center text-[13px]">
+              return activeSessions.map(session => (
+                <div key={session.session_id} className="bg-white rounded-2xl shadow-ios p-5 border border-blue-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-[15px] font-bold text-black flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-ios-blue animate-pulse" />
+                      正在处理
+                    </h2>
+                    <span className="text-[13px] font-medium px-2 py-1 bg-blue-50 text-ios-blue rounded-md">
+                      {session.status === 'queued' ? '排队中' : '进行中'}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-[13px] mb-2 font-medium">
                         <span className="text-ios-gray">
-                          进度: <span className="font-medium text-black">{session.current_position + 1}</span> / {session.total_segments} 段
+                          阶段: <span className="text-black">{session.current_stage === 'polish' ? '润色' : session.current_stage === 'enhance' ? '增强' : session.current_stage}</span>
                         </span>
-
-                        {session.status === 'queued' && queueStatus?.your_position && (
-                          <div className="flex items-center gap-1.5 text-ios-orange">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>
-                              排队第 {queueStatus.your_position} 位
-                              (~{Math.ceil(queueStatus.estimated_wait_time / 60)}分)
-                            </span>
-                          </div>
-                        )}
+                        <span className="text-ios-blue">
+                          {session.progress.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className="bg-ios-blue h-2 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${session.progress}%` }}
+                        />
                       </div>
                     </div>
-                  );
-                })()}
-              </div>
-            )}
+                    <div className="flex justify-between items-center text-[13px]">
+                      <span className="text-ios-gray">
+                        进度: <span className="font-medium text-black">{session.current_position + 1}</span> / {session.total_segments} 段
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ));
+            })()}
           </div>
 
           {/* 右侧 - 历史会话 */}

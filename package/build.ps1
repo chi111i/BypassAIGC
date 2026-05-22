@@ -15,7 +15,7 @@ try {
     $pythonVersion = python --version 2>&1
     Write-Host $pythonVersion -ForegroundColor Green
 } catch {
-    Write-Host "错误: 未找到 Python，请先安装 Python 3.9+" -ForegroundColor Red
+    Write-Host "错误: 未找到 Python，请先安装 Python 3.9+（构建 exe 推荐 3.12+）" -ForegroundColor Red
     exit 1
 }
 

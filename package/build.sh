@@ -15,7 +15,7 @@ echo "=========================================="
 echo ""
 echo "1. 检查 Python 环境..."
 if ! command -v python3 &> /dev/null; then
-    echo "错误: 未找到 Python3，请先安装 Python 3.9+"
+    echo "错误: 未找到 Python3，请先安装 Python 3.9+（构建 exe 推荐 3.12+）"
     exit 1
 fi
 python3 --version

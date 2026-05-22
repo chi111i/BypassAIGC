@@ -3,6 +3,27 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
+class LoginRequest(BaseModel):
+    """用户登录请求"""
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    """用户登录响应"""
+    access_token: str
+    token_type: str = "bearer"
+    username: str
+    display_name: Optional[str] = None
+
+
+class AdminUserCreate(BaseModel):
+    """管理员创建用户"""
+    username: str
+    password: str
+    display_name: Optional[str] = None
+
+
 class UserCreate(BaseModel):
     """创建用户"""
     card_key: str
@@ -12,8 +33,10 @@ class UserCreate(BaseModel):
 class UserResponse(BaseModel):
     """用户响应"""
     id: int
-    card_key: str
-    access_link: str
+    username: Optional[str] = None
+    display_name: Optional[str] = None
+    card_key: Optional[str] = None
+    access_link: Optional[str] = None
     is_active: bool
     created_at: datetime
     last_used: Optional[datetime] = None

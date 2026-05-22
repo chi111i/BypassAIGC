@@ -75,18 +75,13 @@ const SessionMonitor = ({ adminToken }) => {
     }
   };
 
-  const fetchUserSessions = async (userId, cardKey) => {
-    setLoading(true);
+  const fetchUserSessions = async (userId, username) => {
+    setLoadingSessions(true);
     try {
-      const response = await axios.get(`/api/admin/users/${userId}/sessions`, {
-        headers: { Authorization: `Bearer ${adminToken}` }
-      });
-      setUserSessions(response.data);
-      setSelectedUser({ id: userId, card_key: cardKey });
-    } catch (error) {
-      toast.error('获取用户会话历史失败');
+      await fetchUserSessionData(userId);
+      setSelectedUser({ id: userId, username: username });
     } finally {
-      setLoading(false);
+      setLoadingSessions(false);
     }
   };
 
@@ -316,11 +311,11 @@ const SessionMonitor = ({ adminToken }) => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <button
-                        onClick={() => fetchUserSessions(session.user_id, session.card_key)}
+                        onClick={() => fetchUserSessions(session.user_id, session.username || session.card_key)}
                         className="flex items-center gap-2 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg transition-colors text-sm font-medium"
                       >
                         <User className="w-4 h-4" />
-                        {session.card_key}
+                        {session.username || session.card_key}
                       </button>
                       <span className={`px-2 py-1 text-xs font-medium rounded ${
                         session.status === 'processing' ? 'bg-blue-100 text-blue-800' :
@@ -417,7 +412,7 @@ const SessionMonitor = ({ adminToken }) => {
               <div className="flex items-center gap-3">
                 <User className="w-6 h-6 text-blue-600" />
                 <h3 className="text-xl font-bold text-gray-800">
-                  用户会话历史: {selectedUser.card_key}
+                  用户会话历史: {selectedUser.username || selectedUser.card_key}
                 </h3>
               </div>
               <button

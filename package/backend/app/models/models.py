@@ -10,12 +10,15 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    card_key = Column(String(255), unique=True, index=True, nullable=False)
-    access_link = Column(String(255), unique=True, index=True, nullable=False)
+    username = Column(String(255), unique=True, index=True, nullable=True)
+    password_hash = Column(String(255), nullable=True)
+    display_name = Column(String(255), nullable=True)
+    card_key = Column(String(255), unique=True, index=True, nullable=True)
+    access_link = Column(String(255), unique=True, index=True, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used = Column(DateTime, nullable=True)
-    usage_limit = Column(Integer, default=settings.DEFAULT_USAGE_LIMIT)
+    usage_limit = Column(Integer, default=0)  # 0 = 无限制
     usage_count = Column(Integer, default=0)
     
     # 关系

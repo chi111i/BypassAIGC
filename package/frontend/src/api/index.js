@@ -15,12 +15,9 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
-    const cardKey = localStorage.getItem('cardKey');
-    if (cardKey) {
-      config.params = {
-        ...config.params,
-        card_key: cardKey,
-      };
+    const token = sessionStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -36,14 +33,20 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('cardKey');
+      sessionStorage.removeItem('authToken');
+      sessionStorage.removeItem('username');
       window.location.href = '/';
     }
     return Promise.reject(error);
   }
 );
 
-// Admin API
+// Auth API
+export const authAPI = {
+  login: (username, password) =>
+    api.post('/auth/login', { username, password }),
+  getMe: () => api.get('/auth/me'),
+};
 export const adminAPI = {
   generateKeys: (data, password) =>
     api.post('/admin/generate-keys', data, {
@@ -123,9 +126,9 @@ export const optimizationAPI = {
       timeout: 15000, // 15秒超时
     }),
   getStreamUrl: (sessionId) => {
-    const cardKey = localStorage.getItem('cardKey');
+    const token = sessionStorage.getItem('authToken');
     const baseUrl = api.defaults.baseURL || '/api';
-    return `${baseUrl}/optimization/sessions/${sessionId}/stream?card_key=${cardKey}`;
+    return `${baseUrl}/optimization/sessions/${sessionId}/stream?token=${token}`;
   },
 };
 
@@ -190,16 +193,16 @@ export const wordFormatterAPI = {
 
   // Download
   getDownloadUrl: (jobId) => {
-    const cardKey = localStorage.getItem('cardKey');
+    const token = sessionStorage.getItem('authToken');
     const baseUrl = api.defaults.baseURL || '/api';
-    return `${baseUrl}/word-formatter/jobs/${jobId}/download?card_key=${cardKey}`;
+    return `${baseUrl}/word-formatter/jobs/${jobId}/download?token=${token}`;
   },
 
   // SSE stream URL
   getStreamUrl: (jobId) => {
-    const cardKey = localStorage.getItem('cardKey');
+    const token = sessionStorage.getItem('authToken');
     const baseUrl = api.defaults.baseURL || '/api';
-    return `${baseUrl}/word-formatter/jobs/${jobId}/stream?card_key=${cardKey}`;
+    return `${baseUrl}/word-formatter/jobs/${jobId}/stream?token=${token}`;
   },
 
   // Preprocess text
@@ -228,9 +231,9 @@ export const wordFormatterAPI = {
 
   // Preprocess stream URL
   getPreprocessStreamUrl: (jobId) => {
-    const cardKey = localStorage.getItem('cardKey');
+    const token = sessionStorage.getItem('authToken');
     const baseUrl = api.defaults.baseURL || '/api';
-    return `${baseUrl}/word-formatter/preprocess/${jobId}/stream?card_key=${cardKey}`;
+    return `${baseUrl}/word-formatter/preprocess/${jobId}/stream?token=${token}`;
   },
 
   // Get preprocess result

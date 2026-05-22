@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 使用文档
+    url: https://github.com/Liber1917/BypassAIGC#readme
+    about: 提交 Issue 前，请先阅读使用文档，确认不是操作问题
+  - name: 💬 讨论区 / Q&A
+    url: https://github.com/Liber1917/BypassAIGC/discussions
+    about: 如有使用疑问或建议，欢迎在 Discussion 中讨论

@@ -78,24 +78,19 @@ class OptimizationService:
     async def start_optimization(self):
         """开始优化流程"""
         try:
-            # 初始化AI服务
-            self._init_ai_services()
-
-            # 重置错误状态
-            self.session_obj.error_message = None
-            self.session_obj.failed_segment_index = None
-            self.db.commit()
-            
-            # 获取并发权限
-            acquired = await concurrency_manager.acquire(self.session_obj.session_id)
+            # 先获取并发权限（避免未授权就分配 DB 连接和 AI 客户端）
+            acquired = await concurrency_manager.acquire(self.session_obj.session_id, user_id=self.session_obj.user_id)
             if not acquired:
                 self.session_obj.status = "queued"
                 self.db.commit()
                 
-                # 等待获取权限 - acquire 方法内部已包含等待逻辑
-                acquired = await concurrency_manager.acquire(self.session_obj.session_id)
+                # 等待获取权限
+                acquired = await concurrency_manager.acquire(self.session_obj.session_id, user_id=self.session_obj.user_id)
                 if not acquired:
                     raise Exception("等待并发权限超时")
+            
+            # 再初始化 AI 服务
+            self._init_ai_services()
             
             # 更新状态为处理中
             self.session_obj.status = "processing"

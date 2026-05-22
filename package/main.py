@@ -54,7 +54,7 @@ import uvicorn
 # 导入后端应用组件
 from app.config import settings
 from app.database import init_db
-from app.routes import admin, prompts, optimization
+from app.routes import admin, prompts, optimization, auth
 from app.word_formatter import router as word_formatter_router
 from app.word_formatter.services import get_job_manager
 from app.models.models import CustomPrompt
@@ -64,7 +64,7 @@ from app.services.ai_service import get_default_polish_prompt, get_default_enhan
 # 检查默认密钥（仅警告，不退出）
 if settings.SECRET_KEY == "your-secret-key-change-this-in-production":
     print("\n" + "="*60)
-    print("⚠️  安全警告: 检测到默认 SECRET_KEY!")
+    print("[安全警告] 检测到默认 SECRET_KEY!")
     print("="*60)
     print("生产环境必须修改 SECRET_KEY,否则 JWT token 可被伪造!")
     print(f"请在 {ENV_FILE} 文件中设置强密钥:")
@@ -73,7 +73,7 @@ if settings.SECRET_KEY == "your-secret-key-change-this-in-production":
 
 if settings.ADMIN_PASSWORD == "admin123":
     print("\n" + "="*60)
-    print("⚠️  安全警告: 检测到默认管理员密码!")
+    print("[安全警告] 检测到默认管理员密码!")
     print("="*60)
     print("生产环境必须修改 ADMIN_PASSWORD!")
     print(f"请在 {ENV_FILE} 文件中设置强密码 (建议12位以上)")
@@ -83,7 +83,7 @@ if settings.ADMIN_PASSWORD == "admin123":
 app = FastAPI(
     title="AI 论文润色增强系统",
     description="高质量论文润色与原创性学术表达增强",
-    version="1.0.0"
+    version="2.6.5"
 )
 
 # 添加 Gzip 压缩中间件以减少响应体积
@@ -113,6 +113,7 @@ async def add_no_cache_headers(request: Request, call_next):
     return response
 
 # 注册 API 路由（添加 /api 前缀，与 backend/app/main.py 保持一致）
+app.include_router(auth.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(prompts.router, prefix="/api")
 app.include_router(optimization.router, prefix="/api")
@@ -122,10 +123,10 @@ app.include_router(word_formatter_router, prefix="/api")
 @app.on_event("startup")
 async def startup_event():
     """启动时初始化"""
-    print(f"\n📁 应用目录: {APP_DIR}")
-    print(f"📁 配置文件: {ENV_FILE}")
-    print(f"📁 数据库文件: {DB_FILE}")
-    print(f"📁 静态文件目录: {STATIC_DIR}")
+    print(f"\n[应用目录] {APP_DIR}")
+    print(f"[配置文件] {ENV_FILE}")
+    print(f"[数据库文件] {DB_FILE}")
+    print(f"[静态文件目录] {STATIC_DIR}")
     
     # 初始化数据库
     init_db()
@@ -366,6 +367,33 @@ if os.path.exists(STATIC_DIR):
             return FileResponse(index_file)
         return {"error": "Word formatter page not found"}
 
+    @app.get("/spec-generator")
+    @app.get("/spec-generator/{path:path}")
+    async def serve_spec_generator(path: str = ""):
+        """服务排版规范生成器页面"""
+        index_file = os.path.join(STATIC_DIR, 'index.html')
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"error": "Spec generator page not found"}
+
+    @app.get("/article-preprocessor")
+    @app.get("/article-preprocessor/{path:path}")
+    async def serve_preprocessor(path: str = ""):
+        """服务文章预处理页面"""
+        index_file = os.path.join(STATIC_DIR, 'index.html')
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"error": "Preprocessor page not found"}
+
+    @app.get("/format-checker")
+    @app.get("/format-checker/{path:path}")
+    async def serve_format_checker(path: str = ""):
+        """服务格式检查页面"""
+        index_file = os.path.join(STATIC_DIR, 'index.html')
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"error": "Format checker page not found"}
+
     @app.get("/session/{session_id}")
     async def serve_session(session_id: str):
         """服务会话详情页面"""
@@ -374,13 +402,6 @@ if os.path.exists(STATIC_DIR):
             return FileResponse(index_file)
         return {"error": "Session page not found"}
     
-    @app.get("/access/{card_key}")
-    async def serve_access(card_key: str):
-        """服务访问页面"""
-        index_file = os.path.join(STATIC_DIR, 'index.html')
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-        return {"error": "Access page not found"}
     
     # 处理其他静态文件
     @app.get("/{file_path:path}")
@@ -416,7 +437,7 @@ def open_browser(port: int):
     """延迟打开浏览器"""
     time.sleep(2)  # 等待服务器启动
     url = f"http://localhost:{port}"
-    print(f"\n🌐 正在打开浏览器: {url}")
+    print(f"\n[打开浏览器] {url}")
     webbrowser.open(url)
 
 
@@ -457,6 +478,7 @@ EMOTION_BASE_URL=https://api.openai.com/v1
 
 # 并发配置
 MAX_CONCURRENT_USERS=7
+MAX_CONCURRENT_PER_USER=3
 
 # API 请求间隔 (秒，每段落处理后等待，避免触发频率限制)
 API_REQUEST_INTERVAL=6
@@ -475,12 +497,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 # 管理员账户 (请修改默认密码)
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=please-change-this-password
-DEFAULT_USAGE_LIMIT=1
 SEGMENT_SKIP_THRESHOLD=15
 """
         with open(ENV_FILE, 'w', encoding='utf-8') as f:
             f.write(sample_content)
-        print(f"✅ 已创建示例配置文件: {ENV_FILE}")
+        print(f"[完成] 已创建示例配置文件: {ENV_FILE}")
         print("   请编辑此文件，填入您的 API Key 和其他配置")
 
 
@@ -490,15 +511,15 @@ def main():
     host = settings.SERVER_HOST
     
     print("\n" + "="*60)
-    print("🚀 AI 学术写作助手 - 启动中...")
+    print("[启动] AI 学术写作助手 - 启动中...")
     print("="*60)
     
     # 创建示例配置文件
     create_sample_env()
     
-    print(f"\n📍 服务地址: http://{host}:{port}")
-    print(f"📍 管理后台: http://{host}:{port}/admin")
-    print(f"📍 API 文档: http://{host}:{port}/docs")
+    print(f"\n[服务地址] http://{host}:{port}")
+    print(f"[管理后台] http://{host}:{port}/admin")
+    print(f"[API 文档] http://{host}:{port}/docs")
     print("\n按 Ctrl+C 停止服务")
     print("="*60 + "\n")
     
@@ -517,8 +538,15 @@ def main():
             access_log=True
         )
     except KeyboardInterrupt:
-        print("\n\n👋 服务已停止")
+        print("\n\n[已停止] 服务已停止")
         sys.exit(0)
+    except OSError as e:
+        if "10048" in str(e) or "address already in use" in str(e).lower():
+            print(f"\n[错误] 端口 {port} 已被占用!")
+            print(f"请关闭其他占用该端口的程序后重试")
+            print(f"或修改 .env 文件中的 SERVER_PORT 配置使用其他端口")
+            sys.exit(1)
+        raise
 
 
 if __name__ == "__main__":

@@ -3,11 +3,16 @@ import string
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from app.config import settings
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 
 def generate_card_key(length: int = 16, prefix: str = "") -> str:
@@ -29,16 +34,6 @@ def generate_session_id() -> str:
     return secrets.token_urlsafe(32)
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """验证密码"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """哈希密码"""
-    return pwd_context.hash(password)
-
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """创建访问令牌"""
     to_encode = data.copy()
@@ -57,4 +52,26 @@ def verify_token(token: str) -> Optional[dict]:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
     except JWTError:
+        return None
+
+
+def create_user_token(user_id: int, username: str) -> str:
+    """创建用户 JWT token"""
+    expires = timedelta(hours=settings.USER_TOKEN_EXPIRE_HOURS)
+    return create_access_token(
+        data={"sub": str(user_id), "username": username, "role": "user"},
+        expires_delta=expires,
+    )
+
+
+def get_user_from_token(token: str) -> Optional[int]:
+    """从 JWT token 提取 user_id，失败返回 None"""
+    payload = verify_token(token)
+    if not payload:
+        return None
+    if payload.get("role") != "user":
+        return None
+    try:
+        return int(payload["sub"])
+    except (ValueError, KeyError):
         return None

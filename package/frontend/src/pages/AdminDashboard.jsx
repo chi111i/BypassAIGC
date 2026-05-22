@@ -6,7 +6,6 @@ import {
   LogIn,
   LogOut,
   Users,
-  Key,
   Trash2,
   CheckCircle,
   XCircle,
@@ -34,7 +33,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [adminToken, setAdminToken] = useState(localStorage.getItem('adminToken'));
+  const [adminToken, setAdminToken] = useState(sessionStorage.getItem('adminToken'));
   
   // Tab state
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -51,9 +50,12 @@ const AdminDashboard = () => {
   const [statistics, setStatistics] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
 
-  // Card key generation state
-  const [newCardKey, setNewCardKey] = useState('');
-  const [generatedKey, setGeneratedKey] = useState('');
+  // User creation state
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [creatingUsers, setCreatingUsers] = useState(false);
   
   // Batch generation state
   const [batchCount, setBatchCount] = useState(5);
@@ -93,7 +95,7 @@ const AdminDashboard = () => {
       setIsAuthenticated(true);
       fetchUsers();
     } catch (error) {
-      localStorage.removeItem('adminToken');
+      sessionStorage.removeItem('adminToken');
       setAdminToken(null);
       setIsAuthenticated(false);
     }
@@ -110,7 +112,7 @@ const AdminDashboard = () => {
       });
 
       const { access_token } = response.data;
-      localStorage.setItem('adminToken', access_token);
+      sessionStorage.setItem('adminToken', access_token);
       setAdminToken(access_token);
       setIsAuthenticated(true);
       toast.success('登录成功！');
@@ -123,7 +125,7 @@ const AdminDashboard = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminToken');
     setAdminToken(null);
     setIsAuthenticated(false);
     setUsername('');
@@ -160,25 +162,49 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleGenerateCardKey = async (e) => {
-    e.preventDefault();
-    if (!newCardKey.trim()) {
-      toast.error('请输入卡密');
+  const handleAddUser = () => {
+    if (!newUsername.trim() || !newPassword.trim()) {
+      toast.error('用户名和密码不能为空');
       return;
     }
+    const exists = pendingUsers.find(u => u.username === newUsername.trim());
+    if (exists) {
+      toast.error('该用户名已在待添加列表中');
+      return;
+    }
+    setPendingUsers(prev => [...prev, {
+      username: newUsername.trim(),
+      password: newPassword,
+      display_name: newDisplayName.trim() || undefined,
+    }]);
+    setNewUsername('');
+    setNewPassword('');
+    setNewDisplayName('');
+  };
 
+  const handleRemovePendingUser = (username) => {
+    setPendingUsers(prev => prev.filter(u => u.username !== username));
+  };
+
+  const handleCreateUsers = async () => {
+    if (pendingUsers.length === 0) {
+      toast.error('请先添加用户');
+      return;
+    }
+    setCreatingUsers(true);
     try {
-      const response = await axios.post('/api/admin/card-keys', 
-        { card_key: newCardKey },
+      const response = await axios.post('/api/admin/users/create',
+        pendingUsers,
         { headers: { Authorization: `Bearer ${adminToken}` } }
       );
-      
-      setGeneratedKey(response.data.card_key);
-      setNewCardKey('');
-      toast.success('卡密生成成功！');
+      const { total_created, skipped } = response.data;
+      toast.success(`成功创建 ${total_created} 个用户` + (skipped.length > 0 ? `，跳过 ${skipped.length} 个重复` : ''));
+      setPendingUsers([]);
       fetchUsers();
     } catch (error) {
-      toast.error(error.response?.data?.detail || '生成卡密失败');
+      toast.error(error.response?.data?.detail || '创建用户失败');
+    } finally {
+      setCreatingUsers(false);
     }
   };
 
@@ -209,11 +235,6 @@ const AdminDashboard = () => {
     } catch (error) {
       toast.error('删除用户失败');
     }
-  };
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    toast.success('已复制到剪贴板');
   };
 
   const handleBatchGenerate = async () => {
@@ -277,9 +298,9 @@ const AdminDashboard = () => {
   };
 
   const exportUsersToCSV = () => {
-    const headers = ['卡密', '状态', '创建时间', '最后使用'];
+    const headers = ['用户名', '状态', '创建时间', '最后使用'];
     const rows = users.map(user => [
-      user.card_key,
+      user.username || user.card_key,
       user.is_active ? '启用' : '禁用',
       new Date(user.created_at).toLocaleString('zh-CN'),
       user.last_used ? new Date(user.last_used).toLocaleString('zh-CN') : '从未使用'
@@ -689,70 +710,122 @@ const AdminDashboard = () => {
               </>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Card Key Generation */}
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-2xl shadow-ios p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                      <Key className="w-5 h-5 text-blue-600" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Add Users */}
+              <div className="lg:col-span-12">
+                <div className="bg-white rounded-2xl shadow-ios overflow-hidden">
+                  <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-green-50/70 to-white">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <Users className="w-5 h-5 text-green-700" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-bold text-gray-900">添加用户</h2>
+                          <p className="text-xs text-gray-500 mt-0.5">先加入待创建列表，再统一提交</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 bg-white border border-green-100 rounded-lg text-xs font-medium text-green-700">
+                        {pendingUsers.length} 待创建
+                      </span>
                     </div>
-                    <h2 className="text-lg font-bold text-gray-900">生成卡密</h2>
                   </div>
 
-                  <form onSubmit={handleGenerateCardKey} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-2">
-                        卡密内容
+                  <div className="p-5">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                      <label className="md:col-span-3 block">
+                        <span className="block text-xs font-medium text-gray-500 mb-1.5">用户名</span>
+                        <input
+                          type="text"
+                          value={newUsername}
+                          onChange={(e) => setNewUsername(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddUser()}
+                          placeholder="例如 chi11i"
+                          className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                        />
                       </label>
-                      <input
-                        type="text"
-                        value={newCardKey}
-                        onChange={(e) => setNewCardKey(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
-                        placeholder="输入自定义卡密"
-                      />
+                      <label className="md:col-span-3 block">
+                        <span className="block text-xs font-medium text-gray-500 mb-1.5">密码</span>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddUser()}
+                          placeholder="登录密码"
+                          className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                        />
+                      </label>
+                      <label className="md:col-span-4 block">
+                        <span className="block text-xs font-medium text-gray-500 mb-1.5">显示名称</span>
+                        <input
+                          type="text"
+                          value={newDisplayName}
+                          onChange={(e) => setNewDisplayName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddUser()}
+                          placeholder="可选"
+                          className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                        />
+                      </label>
+                      <button
+                        onClick={handleAddUser}
+                        disabled={!newUsername.trim() || !newPassword.trim()}
+                        className="md:col-span-2 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 text-sm"
+                      >
+                        <Plus className="w-4 h-4" />
+                        加入
+                      </button>
                     </div>
 
-                    <button
-                      type="submit"
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm shadow-sm"
-                    >
-                      <Plus className="w-4 h-4" />
-                      生成卡密
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setShowBatchModal(true)}
-                      className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold py-2.5 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Key className="w-4 h-4" />
-                      批量生成
-                    </button>
-                  </form>
-
-                  {generatedKey && (
-                    <div className="mt-6 p-4 bg-green-50/50 border border-green-100 rounded-xl">
-                      <p className="text-xs font-medium text-green-700 mb-2 uppercase tracking-wide">生成的卡密</p>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 bg-white px-3 py-2 rounded-lg border border-green-200 text-sm font-mono text-green-800">
-                          {generatedKey}
-                        </code>
-                        <button
-                          onClick={() => copyToClipboard(generatedKey)}
-                          className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors shadow-sm"
-                        >
-                          复制
-                        </button>
+                    {pendingUsers.length > 0 && (
+                      <div className="mt-5 border border-green-100 rounded-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 bg-green-50/60 border-b border-green-100">
+                          <span className="text-xs font-semibold text-green-800">待创建用户 ({pendingUsers.length})</span>
+                          <button
+                            onClick={() => setPendingUsers([])}
+                            className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+                          >
+                            清空
+                          </button>
+                        </div>
+                        <div className="max-h-44 overflow-y-auto divide-y divide-gray-100">
+                          {pendingUsers.map((u) => (
+                            <div key={u.username} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                              <div className="min-w-0">
+                                <span className="font-medium text-gray-900">{u.username}</span>
+                                {u.display_name && <span className="text-gray-400 ml-2">({u.display_name})</span>}
+                              </div>
+                              <button
+                                onClick={() => handleRemovePendingUser(u.username)}
+                                className="text-gray-300 hover:text-red-500 p-1 rounded-md hover:bg-red-50 transition-colors"
+                                title="移除"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="p-3 bg-white border-t border-gray-100">
+                          <button
+                            onClick={handleCreateUsers}
+                            disabled={creatingUsers}
+                            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm shadow-sm"
+                          >
+                            {creatingUsers ? (
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <Plus className="w-4 h-4" />
+                            )}
+                            批量创建 ({pendingUsers.length})
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Users List */}
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-12">
                 <div className="bg-white rounded-2xl shadow-ios overflow-hidden">
                   <div className="p-6 border-b border-gray-100">
                     <div className="flex items-center justify-between flex-wrap gap-4">
@@ -820,7 +893,7 @@ const AdminDashboard = () => {
                             <tr key={user.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <code className="text-sm font-mono text-gray-900">
-                                  {user.card_key}
+                                  {user.username || user.card_key}
                                 </code>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -1036,8 +1109,8 @@ const AdminDashboard = () => {
               <h4 className="font-semibold text-gray-800 mb-3">基本信息</h4>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <span className="text-gray-600">卡密：</span>
-                  <code className="ml-2 font-mono text-blue-600">{userDetails.user.card_key}</code>
+                  <span className="text-gray-600">用户名：</span>
+                  <code className="ml-2 font-mono text-blue-600">{userDetails.user.username || userDetails.user.card_key}</code>
                 </div>
                 <div>
                   <span className="text-gray-600">状态：</span>

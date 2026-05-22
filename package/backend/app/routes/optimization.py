@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Header
 from sqlalchemy.orm import Session, defer
 from sqlalchemy import func, and_, case
-from typing import List
+from typing import List, Optional
 import json
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models.models import User, OptimizationSession, OptimizationSegment, ChangeLog
 from app.schemas import (
     OptimizationCreate, SessionResponse, SessionDetailResponse,
@@ -12,7 +12,7 @@ from app.schemas import (
 from app.services.optimization_service import OptimizationService
 from app.services.concurrency import concurrency_manager
 from app.services.stream_manager import stream_manager
-from app.utils.auth import generate_session_id
+from app.utils.auth import generate_session_id, get_user_from_token
 from datetime import datetime
 import asyncio
 from app.config import settings
@@ -20,53 +20,64 @@ from sse_starlette.sse import EventSourceResponse
 
 router = APIRouter(prefix="/optimization", tags=["optimization"])
 
+running_tasks: dict[str, asyncio.Task] = {}
 
-def get_current_user(card_key: str, db: Session = Depends(get_db)) -> User:
-    """获取当前用户"""
-    user = db.query(User).filter(
-        User.card_key == card_key,
-        User.is_active.is_(True)
-    ).first()
-    
+
+def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)) -> User:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="未提供认证令牌")
+
+    token = authorization.split(" ")[1]
+    user_id = get_user_from_token(token)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="令牌无效或已过期")
+
+    user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
     if not user:
-        raise HTTPException(status_code=401, detail="无效的卡密")
-    
+        raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
+
     user.last_used = datetime.utcnow()
     db.commit()
-    
     return user
 
 
-async def run_optimization(session_id: int, db: Session):
-    """后台运行优化任务"""
-    session_obj = db.query(OptimizationSession).filter(
-        OptimizationSession.id == session_id
-    ).first()
-    
-    if not session_obj:
-        return
-    
-    service = OptimizationService(db, session_obj)
-    await service.start_optimization()
+async def run_optimization(session_id: int, session_key: str):
+    """后台运行优化任务（独立 DB 会话）"""
+    task = asyncio.current_task()
+    running_tasks[session_key] = task
+    db = SessionLocal()
+    try:
+        session_obj = db.query(OptimizationSession).filter(
+            OptimizationSession.id == session_id
+        ).first()
+        
+        if not session_obj:
+            return
+        
+        service = OptimizationService(db, session_obj)
+        await service.start_optimization()
+    except asyncio.CancelledError:
+        pass  # 任务被取消，正常退出
+    finally:
+        db.close()
+        running_tasks.pop(session_key, None)
 
 
 @router.post("/start", response_model=SessionResponse)
 async def start_optimization(
-    card_key: str,
     data: OptimizationCreate,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """开始优化任务"""
-    user = get_current_user(card_key, db)
+    user = current_user
 
-    usage_limit = user.usage_limit if user.usage_limit is not None else settings.DEFAULT_USAGE_LIMIT
+    usage_limit = user.usage_limit or 0
     usage_count = user.usage_count or 0
-    # 0 表示无限制
     if usage_limit > 0 and usage_count >= usage_limit:
-        raise HTTPException(status_code=403, detail="该卡密已达到使用次数限制")
-    
-    # 验证处理模式
+        raise HTTPException(status_code=403, detail="该账户已达到使用次数限制")
+
     valid_modes = ['paper_polish', 'paper_enhance', 'paper_polish_enhance', 'emotion_polish']
     if data.processing_mode not in valid_modes:
         raise HTTPException(
@@ -74,7 +85,6 @@ async def start_optimization(
             detail=f"无效的处理模式。支持的模式: {', '.join(valid_modes)}"
         )
 
-    # 根据处理模式设置初始阶段
     if data.processing_mode == 'emotion_polish':
         initial_stage = 'emotion_polish'
     elif data.processing_mode == 'paper_enhance':
@@ -82,7 +92,6 @@ async def start_optimization(
     else:
         initial_stage = 'polish'
     
-    # 创建会话
     session_id = generate_session_id()
     session = OptimizationSession(
         user_id=user.id,
@@ -108,34 +117,31 @@ async def start_optimization(
     db.commit()
     db.refresh(session)
     
-    # 添加后台任务
-    background_tasks.add_task(run_optimization, session.id, db)
+    background_tasks.add_task(run_optimization, session.id, session_id)
     
     return session
 
 
 @router.get("/status", response_model=QueueStatusResponse)
 async def get_queue_status(
-    card_key: str,
+    current_user: User = Depends(get_current_user),
     session_id: str = None,
     db: Session = Depends(get_db)
 ):
     """获取队列状态"""
-    user = get_current_user(card_key, db)
-    
     status = await concurrency_manager.get_status(session_id)
     return QueueStatusResponse(**status)
 
 
 @router.get("/sessions", response_model=List[SessionResponse])
 async def list_sessions(
-    card_key: str,
+    current_user: User = Depends(get_current_user),
     limit: int = 20,
     offset: int = 0,
     db: Session = Depends(get_db)
 ):
     """列出用户的所有会话（支持分页）"""
-    user = get_current_user(card_key, db)
+    user = current_user
     
     # 限制最大返回数量为100，避免一次性加载过多数据
     limit = min(limit, 100)
@@ -165,11 +171,11 @@ async def list_sessions(
 @router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
 async def get_session_detail(
     session_id: str,
-    card_key: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """获取会话详情"""
-    user = get_current_user(card_key, db)
+    user = current_user
     
     session = db.query(OptimizationSession).filter(
         OptimizationSession.session_id == session_id,
@@ -193,11 +199,11 @@ async def get_session_detail(
 @router.get("/sessions/{session_id}/progress", response_model=ProgressUpdate)
 async def get_session_progress(
     session_id: str,
-    card_key: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """获取会话进度"""
-    user = get_current_user(card_key, db)
+    user = current_user
     
     # 查询完整会话对象，但避免急切加载关联对象
     session = db.query(OptimizationSession).filter(
@@ -223,12 +229,20 @@ async def get_session_progress(
 async def stream_session_progress(
     session_id: str,
     request: Request,
-    card_key: str,  # 简单的鉴权，实际可能需要更严格的检查
+    token: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """流式获取会话进度和内容"""
-    # 验证用户权限
-    user = get_current_user(card_key, db)
+    # SSE 原生不支持自定义 Header，允许通过 query param 传递 token
+    if token and not current_user:
+        user_id = get_user_from_token(token)
+        if user_id:
+            current_user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+            if not current_user:
+                raise HTTPException(status_code=401, detail="令牌无效")
+    
+    user = current_user
     session = db.query(OptimizationSession).filter(
         OptimizationSession.session_id == session_id,
         OptimizationSession.user_id == user.id
@@ -261,11 +275,11 @@ async def stream_session_progress(
 @router.get("/sessions/{session_id}/changes", response_model=List[ChangeLogResponse])
 async def get_session_changes(
     session_id: str,
-    card_key: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """获取会话的变更对照"""
-    user = get_current_user(card_key, db)
+    user = current_user
     
     session = db.query(OptimizationSession).filter(
         OptimizationSession.session_id == session_id,
@@ -327,8 +341,8 @@ async def get_session_changes(
 @router.post("/sessions/{session_id}/export")
 async def export_session(
     session_id: str,
-    card_key: str,
     confirmation: ExportConfirmation,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """导出优化结果"""
@@ -338,7 +352,7 @@ async def export_session(
             detail="必须确认学术诚信承诺"
         )
     
-    user = get_current_user(card_key, db)
+    user = current_user
     
     session = db.query(OptimizationSession).filter(
         OptimizationSession.session_id == session_id,
@@ -377,11 +391,11 @@ async def export_session(
 @router.delete("/sessions/{session_id}")
 async def delete_session(
     session_id: str,
-    card_key: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """删除会话"""
-    user = get_current_user(card_key, db)
+    """删除会话，同时取消后台任务并释放并发槽位"""
+    user = current_user
     
     session = db.query(OptimizationSession).filter(
         OptimizationSession.session_id == session_id,
@@ -390,6 +404,14 @@ async def delete_session(
     
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
+    
+    # 取消后台运行中的 asyncio Task
+    task = running_tasks.pop(session_id, None)
+    if task and not task.done():
+        task.cancel()
+    
+    # 释放并发槽位
+    await concurrency_manager.release(session_id)
     
     db.delete(session)
     db.commit()
@@ -400,12 +422,12 @@ async def delete_session(
 @router.post("/sessions/{session_id}/retry")
 async def retry_session(
     session_id: str,
-    card_key: str,
     background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """重新尝试处理失败的会话，继续未完成的段落"""
-    user = get_current_user(card_key, db)
+    user = current_user
 
     session = db.query(OptimizationSession).filter(
         OptimizationSession.session_id == session_id,
@@ -424,7 +446,7 @@ async def retry_session(
     session.error_message = f"[重试中] 上次失败原因: {old_error}"
     db.commit()
 
-    background_tasks.add_task(run_optimization, session.id, db)
+    background_tasks.add_task(run_optimization, session.id, session_id)
 
     return {"message": "已重新排队处理未完成段落"}
 
@@ -432,11 +454,11 @@ async def retry_session(
 @router.post("/sessions/{session_id}/stop")
 async def stop_session(
     session_id: str,
-    card_key: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """停止正在进行中的会话"""
-    user = get_current_user(card_key, db)
+    """停止正在进行中的会话，取消后台任务并释放并发槽位"""
+    user = current_user
 
     session = db.query(OptimizationSession).filter(
         OptimizationSession.session_id == session_id,
@@ -448,6 +470,14 @@ async def stop_session(
 
     if session.status not in ["queued", "processing"]:
         raise HTTPException(status_code=400, detail="只能停止排队中或处理中的会话")
+
+    # 取消后台运行中的 asyncio Task
+    task = running_tasks.pop(session_id, None)
+    if task and not task.done():
+        task.cancel()
+
+    # 释放并发槽位
+    await concurrency_manager.release(session_id)
 
     # 更新状态为 stopped
     session.status = "stopped"

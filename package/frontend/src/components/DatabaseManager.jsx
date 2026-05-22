@@ -127,7 +127,7 @@ const DatabaseManager = ({ adminToken }) => {
       'optimization_sessions': '优化会话表',
       'optimization_segments': '优化段落表',
       'system_settings': '系统设置表',
-      'card_keys': '卡密表',
+      'users': '用户表',
       'session_history': '会话历史表'
     };
     return nameMap[tableName] || tableName;

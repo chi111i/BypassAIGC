@@ -11,7 +11,7 @@ from typing import Dict, Tuple, Optional
 # 先导入 config 以便加载环境变量
 from app.config import settings
 from app.database import init_db
-from app.routes import admin, prompts, optimization
+from app.routes import admin, prompts, optimization, auth
 from app.word_formatter import router as word_formatter_router
 from app.word_formatter.services import get_job_manager
 from app.models.models import CustomPrompt
@@ -71,7 +71,7 @@ if settings.ADMIN_PASSWORD == "admin123":
 app = FastAPI(
     title="AI 论文润色增强系统",
     description="高质量论文润色与原创性学术表达增强",
-    version="1.0.0"
+    version="2.6.5"
 )
 
 # 添加 Gzip 压缩中间件以减少响应体积
@@ -90,6 +90,7 @@ app.add_middleware(
 )
 
 # 注册路由（添加 /api 前缀，与 backend/app/main.py 保持一致）
+app.include_router(auth.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(prompts.router, prefix="/api")
 app.include_router(optimization.router, prefix="/api")

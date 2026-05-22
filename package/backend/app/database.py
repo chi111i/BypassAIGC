@@ -5,7 +5,10 @@ from app.config import settings
 
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
+    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    pool_size=20,
+    max_overflow=30,
+    pool_recycle=3600,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -37,7 +40,7 @@ def init_db():
         # 自动添加性能优化索引
         _add_performance_indexes()
         
-        print("✓ 数据库初始化成功")
+        print("[OK] 数据库初始化成功")
         return True
     except Exception as e:
         print(f"✗ 数据库初始化失败: {str(e)}")
@@ -100,7 +103,7 @@ def _add_performance_indexes():
                         f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({column_name})"
                     ))
                     conn.commit()
-                    print(f"  ✓ 添加索引: {index_name}")
+                    print(f"  [OK] 添加索引: {index_name}")
                     
                 except Exception as e:
                     # 索引可能已存在或其他错误
@@ -111,6 +114,64 @@ def _add_performance_indexes():
     except Exception as e:
         print(f"  ⚠ 添加性能索引警告: {str(e)}")
         # 失败不应该阻止应用启动
+
+
+def _relax_legacy_users_required_card_columns(conn):
+    """旧卡密库把 card_key/access_link 设为 NOT NULL，新用户名用户需要允许为空。"""
+    if engine.dialect.name != "sqlite":
+        return False
+
+    table_info = conn.execute(text("PRAGMA table_info(users)")).mappings().all()
+    columns = {column["name"]: column for column in table_info}
+    required_columns = {"card_key", "access_link"}
+    if not required_columns.issubset(columns):
+        return False
+
+    needs_rebuild = any(columns[column]["notnull"] for column in required_columns)
+    if not needs_rebuild:
+        return False
+
+    copy_columns = [
+        "id",
+        "username",
+        "password_hash",
+        "display_name",
+        "card_key",
+        "access_link",
+        "is_active",
+        "created_at",
+        "last_used",
+        "usage_limit",
+        "usage_count",
+    ]
+    existing_copy_columns = [column for column in copy_columns if column in columns]
+    column_sql = ", ".join(existing_copy_columns)
+
+    conn.execute(text("PRAGMA foreign_keys=OFF"))
+    conn.execute(text("""
+        CREATE TABLE users_new (
+            id INTEGER NOT NULL PRIMARY KEY,
+            username VARCHAR(255),
+            password_hash VARCHAR(255),
+            display_name VARCHAR(255),
+            card_key VARCHAR(255),
+            access_link VARCHAR(255),
+            is_active BOOLEAN,
+            created_at DATETIME,
+            last_used DATETIME,
+            usage_limit INTEGER DEFAULT 0,
+            usage_count INTEGER DEFAULT 0
+        )
+    """))
+    conn.execute(text(f"INSERT INTO users_new ({column_sql}) SELECT {column_sql} FROM users"))
+    conn.execute(text("DROP TABLE users"))
+    conn.execute(text("ALTER TABLE users_new RENAME TO users"))
+    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users (username)"))
+    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_card_key ON users (card_key)"))
+    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_access_link ON users (access_link)"))
+    conn.execute(text("PRAGMA foreign_keys=ON"))
+    conn.commit()
+    return True
 
 
 def _migrate_database_schema():
@@ -129,46 +190,60 @@ def _migrate_database_schema():
                     
                     if "failed_segment_index" not in columns:
                         if _add_column_safely(conn, "optimization_sessions", "failed_segment_index", "INTEGER"):
-                            print("  ✓ 添加字段: optimization_sessions.failed_segment_index")
+                            print("  [OK] 添加字段: optimization_sessions.failed_segment_index")
                     
                     if "processing_mode" not in columns:
                         if _add_column_safely(conn, "optimization_sessions", "processing_mode", "VARCHAR(50) DEFAULT 'paper_polish_enhance'"):
-                            print("  ✓ 添加字段: optimization_sessions.processing_mode")
+                            print("  [OK] 添加字段: optimization_sessions.processing_mode")
                     
                     if "emotion_model" not in columns:
                         added = _add_column_safely(conn, "optimization_sessions", "emotion_model", "VARCHAR(100)")
                         _add_column_safely(conn, "optimization_sessions", "emotion_api_key", "VARCHAR(255)")
                         _add_column_safely(conn, "optimization_sessions", "emotion_base_url", "VARCHAR(255)")
                         if added:
-                            print("  ✓ 添加字段: optimization_sessions.emotion_* 字段")
+                            print("  [OK] 添加字段: optimization_sessions.emotion_* 字段")
             
                 # 迁移 users 表
                 if "users" in tables:
                     user_columns = {column["name"] for column in inspector.get_columns("users")}
-                    
+
+                    if "username" not in user_columns:
+                        if _add_column_safely(conn, "users", "username", "VARCHAR(255)"):
+                            print("  [OK] 添加字段: users.username")
+
+                    if "password_hash" not in user_columns:
+                        if _add_column_safely(conn, "users", "password_hash", "VARCHAR(255)"):
+                            print("  [OK] 添加字段: users.password_hash")
+
+                    if "display_name" not in user_columns:
+                        if _add_column_safely(conn, "users", "display_name", "VARCHAR(255)"):
+                            print("  [OK] 添加字段: users.display_name")
+
                     if "usage_limit" not in user_columns:
-                        if _add_column_safely(conn, "users", "usage_limit", f"INTEGER DEFAULT {settings.DEFAULT_USAGE_LIMIT}"):
-                            print("  ✓ 添加字段: users.usage_limit")
-                    
+                        if _add_column_safely(conn, "users", "usage_limit", "INTEGER DEFAULT 0"):
+                            print("  [OK] 添加字段: users.usage_limit")
+
                     if "usage_count" not in user_columns:
                         if _add_column_safely(conn, "users", "usage_count", "INTEGER DEFAULT 0"):
-                            print("  ✓ 添加字段: users.usage_count")
-                    
-                    # 更新 NULL 值
+                            print("  [OK] 添加字段: users.usage_count")
+
                     try:
-                        conn.execute(text(f"UPDATE users SET usage_limit = {settings.DEFAULT_USAGE_LIMIT} WHERE usage_limit IS NULL"))
+                        conn.execute(text("UPDATE users SET usage_limit = 0 WHERE usage_limit IS NULL"))
                         conn.execute(text("UPDATE users SET usage_count = 0 WHERE usage_count IS NULL"))
                         conn.commit()
                     except Exception:
                         conn.rollback()
-            
+
+                    if _relax_legacy_users_required_card_columns(conn):
+                        print("  [OK] 迁移字段约束: users.card_key/access_link 允许为空")
+
                 # 迁移 optimization_segments 表
                 if "optimization_segments" in tables:
                     segment_columns = {column["name"] for column in inspector.get_columns("optimization_segments")}
                     
                     if "is_title" not in segment_columns:
                         if _add_column_safely(conn, "optimization_segments", "is_title", "BOOLEAN DEFAULT 0"):
-                            print("  ✓ 添加字段: optimization_segments.is_title")
+                            print("  [OK] 添加字段: optimization_segments.is_title")
             
                 # 迁移 custom_prompts 表
                 if "custom_prompts" in tables:
@@ -176,11 +251,11 @@ def _migrate_database_schema():
                     
                     if "is_system" not in prompt_columns:
                         if _add_column_safely(conn, "custom_prompts", "is_system", "BOOLEAN DEFAULT 0"):
-                            print("  ✓ 添加字段: custom_prompts.is_system")
+                            print("  [OK] 添加字段: custom_prompts.is_system")
                     
                     if "is_active" not in prompt_columns:
                         if _add_column_safely(conn, "custom_prompts", "is_active", "BOOLEAN DEFAULT 1"):
-                            print("  ✓ 添加字段: custom_prompts.is_active")
+                            print("  [OK] 添加字段: custom_prompts.is_active")
     
     except Exception as e:
         print(f"  ⚠ 数据库迁移警告: {str(e)}")

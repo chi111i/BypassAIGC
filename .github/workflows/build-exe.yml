@@ -2,6 +2,8 @@ name: Build Executable
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -87,144 +89,8 @@ jobs:
           path: package/AI学术写作助手-Windows-*.zip
           retention-days: 30
 
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: package/requirements.txt
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package/frontend/package-lock.json
-
-      - name: Install Python dependencies
-        working-directory: package
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Install frontend dependencies
-        working-directory: package/frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: package/frontend
-        run: npm run build
-
-      - name: Copy frontend build to static
-        working-directory: package
-        run: |
-          rm -rf static
-          cp -r frontend/dist static
-
-      - name: Build with PyInstaller
-        working-directory: package
-        run: pyinstaller app.spec --clean
-
-      - name: Get version
-        id: version
-        run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=dev-${{ github.sha }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create tar archive
-        working-directory: package
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          tar -czvf "AI学术写作助手-Linux-${version}.tar.gz" -C dist "AI学术写作助手"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AI学术写作助手-Linux-${{ steps.version.outputs.version }}
-          path: package/AI学术写作助手-Linux-*.tar.gz
-          retention-days: 30
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: package/requirements.txt
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package/frontend/package-lock.json
-
-      - name: Install Python dependencies
-        working-directory: package
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Install frontend dependencies
-        working-directory: package/frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: package/frontend
-        run: npm run build
-
-      - name: Copy frontend build to static
-        working-directory: package
-        run: |
-          rm -rf static
-          cp -r frontend/dist static
-
-      - name: Build with PyInstaller
-        working-directory: package
-        run: pyinstaller app.spec --clean
-
-      - name: Get version
-        id: version
-        run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=dev-${{ github.sha }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create tar archive
-        working-directory: package
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          tar -czvf "AI学术写作助手-macOS-${version}.tar.gz" -C dist "AI学术写作助手"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AI学术写作助手-macOS-${{ steps.version.outputs.version }}
-          path: package/AI学术写作助手-macOS-*.tar.gz
-          retention-days: 30
-
   release:
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -240,7 +106,6 @@ jobs:
         with:
           files: |
             artifacts/**/*.zip
-            artifacts/**/*.tar.gz
           draft: false
           prerelease: false
           generate_release_notes: true

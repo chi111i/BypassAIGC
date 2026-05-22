@@ -1,0 +1,67 @@
+name: "功能建议 / Feature Request"
+description: "提交新的功能需求或改进建议"
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 💡 提交前请检查
+
+        - ✅ 我已搜索过已有 Issue，确认没有重复建议
+        - ✅ 我的建议与 AI 学术写作助手的产品定位相符
+
+        ---
+
+  - type: textarea
+    id: background
+    attributes:
+      label: "背景 / 场景"
+      description: "说明你在什么场景下遇到了这个需求，当前有什么痛点？"
+      placeholder: "我在撰写毕业论文时，需要频繁调整参考文献格式，目前需要手动修改，效率很低……"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "需求描述"
+      description: "请从用户视角描述你希望程序新增或改进什么功能"
+      placeholder: "希望新增一个「一键格式化参考文献」功能，用户上传 BibTeX 文件后自动转换为指定格式……"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "验收标准"
+      description: "什么样的表现才算是满足了这个需求？请尽量用 checklist 列出"
+      placeholder: |
+        - [ ] 支持 GB/T 7714 格式输出
+        - [ ] 支持 APA 7th 格式输出
+        - [ ] 支持批量导入 BibTeX 文件
+        - [ ] 导出后可直接复制到 Word
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "优先级"
+      description: "你觉得这个功能有多重要？"
+      options:
+        - P0 - 影响核心使用，急需
+        - P1 - 重要，希望近期实现
+        - P2 - 不错的功能，有时间可以做
+        - P3 - 锦上添花
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: "参考示例"
+      description: "如果有其他同类产品实现了类似功能，请提供截图或链接"
+      placeholder: "例如：Notion AI 的写作辅助功能……"
+    validations:
+      required: false
