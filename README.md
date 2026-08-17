@@ -218,7 +218,7 @@ git push origin v1.0.0
 
 Creative Commons (CC BY-NC-SA 4.0)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=chi111i/BypassAIGC&type=Date)](https://star-history.com/#chi111i/BypassAIGC)
+[![Star History Chart](https://star-history.dera.page/svg?repos=chi111i/BypassAIGC&type=Date)](https://star-history.dera.page/#chi111i/BypassAIGC&type=Date)
 
 
 
